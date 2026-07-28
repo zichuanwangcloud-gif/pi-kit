@@ -1,16 +1,16 @@
 ---
 name: linear-to-pr
-description: 只给一个 Linear 编号（如 CR-1170、#1170 或裸数字 1170），读取 Linear issue，基于 origin/dev 创建隔离 worktree，完成实现、验证、推送功能分支并向 dev 创建 PR。用于“linear”“CR-编号”“拿 issue 做需求”“按编号开发”“issue to pr”“编号开工”等请求。
+description: 只给一个 Linear 编号（如 CR-1170、#1170 或裸数字 1170），读取正文和全部评论/PRD，确认需求理解后基于最新 origin/dev 创建隔离 worktree，完成实现与验证，并自动提交、推送功能分支、向 dev 创建 PR。用于“linear”“CR-编号”“拿 issue 做需求”“按编号开发”“issue to pr”“编号开工”等请求。
 compatibility: Requires git, Node.js 18+, authenticated gh CLI, and LINEAR_API_KEY or ~/.config/pi/linear-api-key. Designed for the CloudRouter repository.
 allowed-tools: read bash edit write invoke_skill
 metadata:
   source: /opt/CloudRouter/.claude/skills/clouditera/linear-to-pr/SKILL.md
-  pi-port: "1"
+  pi-port: "2"
 ---
 
 # linear-to-pr：从 Linear 编号到 dev PR
 
-输入一个 Linear 编号，完成“读取需求 → 理解闸门 → 隔离开发 → 验证 → 推送功能分支 → 创建 dev PR”。
+输入一个 Linear 编号，完成“读取需求 → 理解闸门 → 用户确认一次 → 隔离开发 → 验证 → 自动提交并推送功能分支 → 自动创建 dev PR”。理解卡确认后，不再为 push 和创建 PR 二次询问。
 
 此版本专用于 Pi：
 
@@ -38,7 +38,7 @@ metadata:
 5. 必须在独立 worktree 中修改代码。不得修改主仓库工作区，不得清理、stash、reset 或覆盖用户已有改动。
 6. 进入 worktree 后，所有读写和构建都使用该 worktree 内的路径。禁止用 `/opt/CloudRouter/...` 指向主工作区文件。
 7. 需求不清、代码中找不到对应功能、存在多个候选落点或需要产品选型时，必须停下来询问，不能猜。
-8. 创建 Linear 评论、修改 Linear 状态、推送分支和创建 PR 都是外部动作。执行前必须让用户看到计划；推送和建 PR 应在理解卡确认及实现验证完成后进行。回写 Linear 必须单独征得用户同意。
+8. 用户确认需求理解卡和实施计划，即视为授权本 Skill 在验证通过后自动提交、推送当前任务的 `feature/*`/`fix/*` 分支并创建到 `dev` 的 PR；不得在完成实现后再次等待 push/PR 确认。该授权不包括 force push、合并 PR、直推受保护分支、回写 Linear、部署或其他外部动作。回写 Linear 仍必须单独征得用户同意。
 9. 不打印、记录或提交 `LINEAR_API_KEY`。不得把凭据写入仓库。
 10. 遵守仓库根目录及目标模块的 `AGENTS.md` / `CLAUDE.md`。后端保持 handler → service → repository 分层。
 11. **必须阅读全部 Linear 评论。** 评论可能包含 PRD、验收标准、产品澄清、原型链接和对正文的修订；未审阅完整评论时间线、附件及相关 PRD 链接前禁止开工。
@@ -279,7 +279,7 @@ git diff
 
 必须报告：运行了哪些命令、哪些通过、哪些未运行及原因。失败不得隐瞒。
 
-## Step 6：提交、推送功能分支
+## Step 6：自动提交并推送功能分支
 
 提交前确认：
 
@@ -302,23 +302,27 @@ git commit -m "<type>(cv2): <简述> (CR-1170)"
 
 不要自动添加虚假或不适用的 Co-Authored-By。
 
-向用户汇报验证与提交摘要，并确认可以执行外部动作后：
+提交成功后无需再次询问，立即推送当前任务分支：
 
 ```bash
 git push -u origin "$BR"
 ```
 
-禁止 `--force`。
+禁止 `--force`，禁止使用 refspec 把当前提交推到 `dev/main/test`。如果 push 失败，保留 worktree 和 commit，报告完整错误并停止；不得改用 force push。
 
-## Step 7：创建到 dev 的 PR
+## Step 7：自动创建到 dev 的 PR
 
-再次确认 base/head：
+push 成功后无需再次询问，立即检查当前分支是否已有 PR：
 
 ```bash
 gh pr view "$BR" --json url,baseRefName,headRefName,state 2>/dev/null || true
 ```
 
-如果不存在 PR，创建：
+处理规则：
+
+- 已有 `OPEN` PR 且 `baseRefName=dev`、`headRefName=$BR`：复用该 PR，并按当前提交更新最终报告；不要重复创建。
+- 已有 PR 但 base/head 不正确，或状态为 `MERGED`/`CLOSED`：停止并报告，不得自行重开、改 base 或另建重复 PR。
+- 不存在 PR：自动创建：
 
 ```bash
 gh pr create --base dev --head "$BR" \
@@ -350,7 +354,7 @@ PR body 使用：
 - ...
 ```
 
-创建后验证 PR 的 `baseRefName` 必须为 `dev`、`headRefName` 必须为当前功能分支。不要自动合并 PR。
+创建后必须再次运行 `gh pr view "$BR" --json url,baseRefName,headRefName,state`，确认 `state=OPEN`、`baseRefName=dev`、`headRefName=$BR`。创建失败时报告命令错误和已推送分支地址，不得把“分支已推送”误报成“PR 已创建”。不要自动合并、approve 或 ready PR。
 
 回写 Linear 评论或状态必须另行征得用户同意。Pi 版默认不提供写入 Linear 的辅助脚本，避免无意对外修改；如获同意，可使用 Linear GraphQL mutation，但必须先展示拟写内容。
 
@@ -375,4 +379,6 @@ worktree 默认保留供 review。只有用户确认已不需要后才能清理�
 - 分支类型、schema/migration、数据兼容、计费、安全或权限设计存在分歧。
 - branch/worktree 路径已经存在。
 - 测试失败且无法明确证明与本改动无关。
-- 需要 push、建 PR、回写 Linear，而用户尚未看到并确认对应计划/结果。
+- 需要回写 Linear、合并/approve/ready PR、部署或执行其他未授权外部动作。
+
+**不得停下询问的情形**：需求理解卡和计划已经获得用户确认、实现与验证已完成、当前分支和 worktree 均正常时，不得再询问“是否 push/是否创建 PR”；必须自动完成 Step 6–7。

@@ -14,7 +14,7 @@ CloudRouter 团队/个人使用的便携 Pi 工具包，集中保存：
 | 帮助中心 | `/help` | 动态展示已安装命令、Skill、路线图与安全规则，不调用模型 |
 | Skill 调度 | `/skills`、`invoke_skill` | 交互或模型自动加载已发现 Skill |
 | 功能溯源 | `/skill:feature-trace <描述>` | 回溯真实前后端调用链、渲染树、UI 文案和 QA checklist |
-| Linear → PR | `/skill:linear-to-pr CR-N` | 读取正文、全部评论/PRD，理解确认后从 origin/dev 建 worktree并走 PR 流程 |
+| Linear → PR | `/skill:linear-to-pr CR-N` | 读取正文、全部评论/PRD；理解确认后从 origin/dev 建 worktree，完成实现验证并自动 push 功能分支、创建 dev PR |
 | Engineering Loop | `/loop` | 单 Session 安全迭代，支持 validator、promise、空转检测和外部操作阻断 |
 
 ## 安装
@@ -55,7 +55,7 @@ pi install git:git@github.com:zichuanwangcloud-gif/pi-kit.git@main
 建议使用 tag 固定版本：
 
 ```bash
-pi install git:git@github.com:zichuanwangcloud-gif/pi-kit.git@v0.1.0
+pi install git:git@github.com:zichuanwangcloud-gif/pi-kit.git@v0.2.0
 ```
 
 更新未固定 ref 的包：
@@ -136,4 +136,4 @@ pi -e ./extensions/engineering-loop/index.ts
 - Loop 默认阻止 push、PR、SSH、部署和破坏性 Git 操作
 - 项目存在未提交改动时不 reset/clean/stash
 - Linear 正文、全部评论和关键 PRD 未审阅完前不实现
-- 用户确认前不执行外部动作
+- Linear Skill 在用户确认理解卡和计划后自动 push 功能分支、创建 dev PR；合并/approve/ready PR、回写 Linear和部署仍需单独确认

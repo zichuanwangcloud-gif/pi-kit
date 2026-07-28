@@ -169,7 +169,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 					{
 						title: "流程",
 						lines: [
-							"读取 Linear 正文、全部评论、附件和 PRD/原型链接 → 输出评论时间线与冲突清单 → 输出需求理解卡 → 用户确认 → 从 origin/dev 创建隔离 worktree → 实现与验证 → 用户确认外部动作 → 推送功能分支 → 创建到 dev 的 PR。",
+							"读取 Linear 正文、全部评论、附件和 PRD/原型链接 → 输出评论时间线与冲突清单 → 输出需求理解卡 → 用户确认一次 → 从 origin/dev 创建隔离 worktree → 实现与验证 → 自动提交并推送功能分支 → 自动创建到 dev 的 PR。",
 						],
 					},
 					{
@@ -188,9 +188,11 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 						],
 					},
 					{
-						title: "安全约束",
+						title: "自动 PR 与安全约束",
 						lines: [
-							"禁止直接 push main/dev/test；禁止 force push；主工作区有改动时不清理、不 stash、不覆盖；需求或真实落点不清时必须停下来询问。",
+							"确认需求理解卡和实施计划后，即授权 Skill 在验证完成后自动提交、推送 feature/fix 分支并创建到 dev 的 PR，不再二次询问。",
+							"自动化不包括合并/approve/ready PR、回写 Linear、部署、force push 或直推 main/dev/test。",
+							"主工作区有改动时不清理、不 stash、不覆盖；需求或真实落点不清时必须停下来询问。",
 						],
 					},
 				],
@@ -269,7 +271,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 					{
 						title: "Linear 开发",
 						lines: [
-							"必须基于最新 origin/dev 创建隔离 worktree；需求期望或真实落点不清时停止；push、建 PR、回写 Linear 属外部动作，需要确认。",
+							"必须基于最新 origin/dev 创建隔离 worktree；需求期望或真实落点不清时停止；理解卡确认后自动 push 功能分支并建 dev PR；回写 Linear、合并/approve/ready PR 仍需单独确认。",
 						],
 					},
 				],

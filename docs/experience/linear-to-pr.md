@@ -26,7 +26,8 @@ CloudRouter 可能同时存在上游组件与 `clouditera` 影子组件。必须
 - 显式以 `origin/dev` 为 base
 - 在独立 feature/fix worktree 中修改
 - 主工作区 dirty 时不做 reset/clean/stash
-- push 和 PR 是外部动作，需在实现和验证后获得确认
+- 用户确认需求理解卡和实施计划后，Skill 自动提交、推送 feature/fix 分支并创建到 dev 的 PR，不再二次询问
+- 自动授权不包含 force push、合并/approve/ready PR、直推受保护分支、回写 Linear 或部署
 
 ## 凭据
 
