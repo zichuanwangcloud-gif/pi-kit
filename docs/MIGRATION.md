@@ -27,8 +27,8 @@ node --version
 pi --version
 
 # 2. 克隆并安装 Kit
-git clone <private-url> ~/git/cloudrouter-pi-kit
-cd ~/git/cloudrouter-pi-kit
+git clone git@github.com:zichuanwangcloud-gif/pi-kit.git ~/git/pi-kit
+cd ~/git/pi-kit
 ./scripts/bootstrap.sh
 
 # 3. GitHub 登录
@@ -61,15 +61,15 @@ Pi 内：
 旧电脑：
 
 ```bash
-cd ~/git/cloudrouter-pi-kit
-./scripts/export-bundle.sh ~/cloudrouter-pi-kit.bundle
+cd ~/git/pi-kit
+./scripts/export-bundle.sh ~/pi-kit.bundle
 ```
 
 将 bundle 复制到新电脑后：
 
 ```bash
-git clone ~/cloudrouter-pi-kit.bundle ~/git/cloudrouter-pi-kit
-cd ~/git/cloudrouter-pi-kit
+git clone ~/pi-kit.bundle ~/git/pi-kit
+cd ~/git/pi-kit
 ./scripts/bootstrap.sh
 ```
 
@@ -79,6 +79,6 @@ Bundle 只包含 Git 已提交内容，不包含 Linear Key、模型凭据、SSH
 
 ```bash
 pi list
-cd ~/git/cloudrouter-pi-kit
+cd ~/git/pi-kit
 npm run check
 ```

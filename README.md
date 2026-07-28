@@ -1,4 +1,4 @@
-# CloudRouter Pi Kit
+# Pi Kit
 
 CloudRouter 团队/个人使用的便携 Pi 工具包，集中保存：
 
@@ -28,7 +28,7 @@ CloudRouter 团队/个人使用的便携 Pi 工具包，集中保存：
 脚本执行：
 
 ```bash
-pi install /absolute/path/to/cloudrouter-pi-kit
+pi install /absolute/path/to/pi-kit
 ```
 
 然后在 Pi 中运行：
@@ -41,21 +41,21 @@ pi install /absolute/path/to/cloudrouter-pi-kit
 ### 新电脑安装
 
 ```bash
-git clone <你的私有仓库 URL> ~/git/cloudrouter-pi-kit
-cd ~/git/cloudrouter-pi-kit
+git clone git@github.com:zichuanwangcloud-gif/pi-kit.git ~/git/pi-kit
+cd ~/git/pi-kit
 ./scripts/bootstrap.sh
 ```
 
 也可以直接从 Git 安装：
 
 ```bash
-pi install git:git@github.com:<owner>/cloudrouter-pi-kit.git@main
+pi install git:git@github.com:zichuanwangcloud-gif/pi-kit.git@main
 ```
 
 建议使用 tag 固定版本：
 
 ```bash
-pi install git:git@github.com:<owner>/cloudrouter-pi-kit.git@v0.1.0
+pi install git:git@github.com:zichuanwangcloud-gif/pi-kit.git@v0.1.0
 ```
 
 更新未固定 ref 的包：

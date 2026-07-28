@@ -11,5 +11,5 @@ fi
 pi install "$ROOT"
 
 echo
-echo "CloudRouter Pi Kit installed from: $ROOT"
+echo "Pi Kit installed from: $ROOT"
 echo "Run /reload in an existing Pi session, then /help installed."
