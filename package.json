@@ -1,0 +1,32 @@
+{
+  "name": "cloudrouter-pi-kit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable Pi extensions, skills, and engineering experience for CloudRouter development.",
+  "keywords": [
+    "pi-package",
+    "cloudrouter",
+    "engineering-loop",
+    "linear"
+  ],
+  "license": "UNLICENSED",
+  "pi": {
+    "extensions": [
+      "./extensions/cloudrouter-help.ts",
+      "./extensions/skill-runner.ts",
+      "./extensions/engineering-loop/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-agent-core": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "scripts": {
+    "check": "node --check skills/linear-to-pr/scripts/fetch-linear-issue.mjs && node tests/package-structure.mjs"
+  }
+}
