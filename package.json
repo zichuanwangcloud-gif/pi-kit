@@ -2,6 +2,7 @@
   "name": "cloudrouter-pi-kit",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Portable Pi extensions, skills, and engineering experience for CloudRouter development.",
   "keywords": [
     "pi-package",

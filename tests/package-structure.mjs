@@ -13,6 +13,7 @@ const required = [
 	"extensions/engineering-loop/parser.ts",
 	"extensions/engineering-loop/types.ts",
 	"extensions/engineering-loop/utils.ts",
+	"skills/feature-trace/SKILL.md",
 	"skills/linear-to-pr/SKILL.md",
 	"skills/linear-to-pr/scripts/fetch-linear-issue.mjs",
 	"docs/MIGRATION.md",
