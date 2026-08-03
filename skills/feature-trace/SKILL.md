@@ -1,108 +1,136 @@
 ---
 name: feature-trace
-description: 从一句话功能描述、Linear issue、changelog 或 PR 标题回溯真实代码实现、前端 UI 入口、用户可见中英文文案和后端调用链，并生成 QA checklist。用于“功能溯源”“前端入口在哪”“这个功能怎么测”“提测说明”“功能定位”等请求。
-compatibility: Requires ripgrep and a readable project checkout. Optimized for Vue/React plus Go backends, including CloudRouter clouditera shadow components.
+description: 从功能描述、Issue、changelog、commit 或 PR 线索追踪当前仓库中的真实代码实现、用户入口、可见文案、依赖调用链，并生成带证据的 QA checklist。用于“功能入口在哪”“实现在哪里”“这个功能怎么测”“提测说明”“功能定位”等请求。
+compatibility: Requires a readable project checkout and a code search tool such as ripgrep. Supports monorepos and common frontend/backend stacks without requiring a specific framework.
 allowed-tools: read bash
 metadata:
-  source: /opt/CloudRouter/.claude/skills/clouditera/feature-trace/SKILL.md
-  pi-port: "1"
+  category: code-understanding
+  portability: project-agnostic
 ---
 
-# feature-trace：功能溯源与测试指引
+# Feature Trace：功能溯源与测试指引
 
-输入一句功能描述，产出“业务摘要 → 真实代码调用链 → 用户可见入口 → UI 文案证据 → QA checklist”。
+输入一个功能线索，产出“业务摘要 → 真实代码路径 → 用户入口 → 文案/接口证据 → QA checklist”。
 
-## Pi 工具约定
+## 工具约定
 
-- 用 `bash` 执行 `rg --files`、`rg -n`、`find`、`git log/show` 做发现和搜索。
+- 用 `bash` 执行 `rg --files`、`rg -n`、`find`、`git log/show` 等发现命令。
 - 用 `read` 阅读目标文件，不使用 `cat`、`sed` 代替。
 - 本 Skill 只分析和输出报告，不修改项目文件。
-- 所有结论必须有文件和行号证据；找不到时明确写“未找到”，不能编造。
+- 所有事实结论尽量提供 `文件:行号`；找不到时明确写“未找到”或“待确认”，不能编造。
+- 先读取仓库根目录和目标模块的 `AGENTS.md`、`CLAUDE.md`、贡献指南等项目说明。
 
 ## 核心原则
 
-1. **双向追溯**：后端路由 → handler → service → repository，同时前端 API → 页面组件 → 路由 → 菜单。
-2. **真实渲染树优先**：同名组件可能有上游版、影子版和旧版；必须沿当前路由/import 确认实际生效文件。
-3. **字段证据优先**：最终落到按钮、标签、表头、Toast 等用户肉眼可见文案。
-4. **中英文对照**：有 i18n 时给出 key、中文、英文和文件:行号；无 i18n 时列硬编码文案。
-5. **禁止幻觉**：需求名和代码术语不一致时列候选，不猜相近功能。
-6. **分层准确**：CloudRouter 后端遵守 handler → service → repository，不把 repository 逻辑误写成 handler 行为。
+1. **从项目事实出发**：先识别仓库类型、应用边界和架构，再选择追踪路径，不预设 Vue/React/Go 或固定目录。
+2. **双向追溯**：可从入口向依赖追踪，也可从 API/事件/数据模型反查调用方，直到两侧证据闭合。
+3. **真实生效树优先**：同名组件、旧版页面、平台覆写、生成代码和多服务实现可能并存；必须沿当前注册/import/配置确认实际生效文件。
+4. **用户证据优先**：有 UI 时落到菜单、按钮、字段、提示、URL 或 CLI 输出；无 UI 时明确接口、事件或后台触发入口。
+5. **国际化不强求**：存在 i18n 时给出 key 和语言值；没有时列硬编码文案；服务端任务不要虚构 UI。
+6. **架构忠实**：使用目标项目真实的层级名称和调用关系，不把固定的 handler/service/repository 模板强加给所有代码库。
+7. **推断与事实分离**：需求术语和代码术语不一致时列候选与排除依据。
+
+## Phase 0：边界与项目说明
+
+先确认：
+
+```bash
+git rev-parse --show-toplevel
+git status --short --branch
+find .. -name AGENTS.md -o -name CLAUDE.md
+```
+
+只读取当前仓库及相关目标模块的说明。记录：
+
+- 输入指向的 Issue/PR/commit/功能关键词
+- 当前 checkout 和分支是否足以代表待测版本
+- 是否为 monorepo，以及可能的应用边界
+- 项目要求的搜索、生成文件或测试约定
+
+如果用户给的是 Issue URL/编号而当前环境无法读取，应说明缺口，并先基于可用文字做候选搜索，不臆造需求正文。
 
 ## Phase 1：项目探测
 
-先建立项目地图。使用：
+用有限查询建立项目地图：
 
 ```bash
-rg --files -g 'package.json' -g 'pnpm-workspace.yaml' -g 'go.mod' -g 'Cargo.toml'
-rg --files | rg '(^|/)(router|routes|pages|views|components|i18n|locales|api|services?|handlers?|repositories?)/'
+rg --files -g 'package.json' -g 'pnpm-workspace.yaml' -g 'go.mod' \
+  -g 'Cargo.toml' -g 'pyproject.toml' -g 'pom.xml' -g 'build.gradle*'
+rg --files | rg '(^|/)(router|routes|pages|views|components|locales|i18n|api|controllers?|handlers?|services?|repositories?|cmd)/'
 ```
 
-记录：
+根据实际项目记录：
 
-- 前端框架与 package 路径
-- 路由文件
-- 侧边栏/菜单组件
-- i18n 中文与英文文件
-- 前端 API 封装目录
-- 后端路由、handler、service、repository 目录
-- monorepo 中目标 app
+- 用户入口：Web 路由、移动端导航、CLI command、HTTP/RPC route、job/event consumer
+- 组合关系：imports、注册表、依赖注入、插件清单、feature flag
+- 文案来源：locale、模板、schema、硬编码输出
+- 数据与外部依赖：repository/DAO、消息队列、缓存、第三方 API
+- 目标 app/package/module
 
-CloudRouter 特别检查：
+没有某类层次时跳过，不为了套模板而继续搜索。
 
-- `apps/console` 与 `apps/console-v2`
-- `router/index.ts` 与 `router/clouditera/index.ts`
-- 上游组件与 `clouditera` 影子组件
-- `internal/server/routes`、`internal/handler`、`internal/service`、`internal/repository`
+## Phase 2：关键词与历史线索
 
-## Phase 2：关键词提取
+从输入提取：
 
-从输入抽取：
-
-- 1–3 个名词概念
+- 1–3 个业务名词
 - 1–2 个操作动词
-- 中英文和常见代码命名变体
-- Issue/PR/commit 编号（若有）
+- 中英文、缩写和常见代码命名变体
+- Issue/PR/commit 编号
+- 可能的 URL、API path、配置 key 或文案
 
-先用多个窄查询，不要直接对整个仓库输出海量结果：
+先对候选目录做多个窄查询，再扩展范围：
 
 ```bash
-rg -n -i 'keyword1|关键词1' <候选目录>
+rg -n -i 'keyword1|关键词1' <candidate-paths>
 git log --oneline --all --grep='keyword' -20
 ```
 
-## Phase 3：后端追溯
+搜索无结果时应更换代码术语、查 Git 历史或从用户可见文案反查，不以相似名称直接下结论。
 
-1. 从路由或 handler 搜索核心词。
-2. 用 `read` 阅读命中函数上下文。
-3. 反查路由注册，确认 HTTP 方法、路径和中间件/权限。
-4. 沿调用链定位 service 和 repository。
-5. 记录数据表、Redis、第三方 API 和副作用。
+## Phase 3：运行时/后端路径
 
-输出证据格式：
+根据项目架构，从真实注册点开始：
+
+1. 找 route、command、event、job 或 public API 注册。
+2. 阅读入口函数上下文，确认权限、中间件、feature flag 和参数。
+3. 沿调用关系定位 use case/service/domain/data adapter。
+4. 记录数据库、缓存、队列、文件、第三方 API 和其他副作用。
+5. 反查调用方，确认该实现确实由当前入口使用。
+
+证据示例：
 
 ```text
-apps/.../routes/foo.go:42 POST /api/v1/foo
-apps/.../handler/foo.go:88 HandleFoo
-apps/.../service/foo.go:131 CreateFoo
-apps/.../repository/foo.go:57 Insert
+packages/api/routes/items.ts:42 POST /api/items
+packages/api/controllers/items.ts:88 createItem
+packages/core/use-cases/create-item.ts:31 execute
+packages/db/item-repository.ts:57 insert
 ```
 
-纯前端功能应明确标注“未涉及后端”；不要强行寻找不存在的 API。
+这是格式示例，不代表项目必须具有这些目录或层次。纯客户端功能应明确标注未发现服务端调用。
 
-## Phase 4：前端追溯
+## Phase 4：用户入口与前端路径
 
-1. 用后端 API 路径搜索前端 API 封装。
-2. 用封装函数名搜索实际调用页面/组件。
-3. 沿 route `component`/dynamic import 确认真实渲染组件。
-4. 沿菜单配置确认角色可见性和菜单路径。
-5. 收集页面中的 i18n key、硬编码文案、按钮、标签、表头、Toast 和 placeholder。
-6. 在 zh/en locale 中定位对应值与行号。
+若功能有 UI：
 
-必须防止“修错/查错组件树”：如果存在多个候选，逐一说明为什么某个生效、其他不生效。
+1. 用 API path、query/mutation、event 或函数名搜索客户端封装。
+2. 用封装函数反查实际调用页面/组件。
+3. 沿 route、dynamic import、注册表和 feature flag 确认真正渲染树。
+4. 沿菜单/导航配置确认角色、权限和可见条件。
+5. 收集按钮、标签、表头、toast、placeholder、错误提示等证据。
+6. 若使用 i18n，在相关 locale 中定位 key 与语言值。
 
-## Phase 5：Git 证据（可选）
+若功能不是 UI：
 
-输入像 commit/PR/changelog 时：
+- CLI：记录命令、参数、help 文案和输出。
+- API：记录鉴权、method/path/schema 和错误响应。
+- 后台任务：记录调度、事件来源、开关和可观测结果。
+
+存在多个候选时逐一说明生效/排除依据。
+
+## Phase 5：Git 证据（按需）
+
+输入包含 commit、PR 或 changelog 时：
 
 ```bash
 git log --oneline --all --grep='<keyword>' -20
@@ -110,77 +138,83 @@ git show <sha> --stat
 git show <sha> -- <target-files>
 ```
 
-Git 证据用于精化，不替代当前代码调用链确认。
+历史证据只用于解释演变；最终结论必须再次对照当前 checkout。
+
+## Phase 6：形成 QA Checklist
+
+测试点必须从追踪证据生成，至少考虑：
+
+- 正常路径
+- 输入/状态边界
+- 失败与恢复
+- 权限、角色或 feature flag
+- 数据/缓存/异步副作用
+- 相关入口和旧行为回归
+- 多语言或可访问性（项目适用时）
+
+无法在静态代码中确认的运行环境、账号、数据和第三方依赖列为测试前置或未确认项。
 
 ## 输出模板
 
 ```markdown
-# <20 字以内标题>
+# <简短标题>
 
 ## 业务摘要
+<问题、角色/调用方、触发、流程和结果。>
 
-<3–5 句话：问题、角色、触发、流程、结果和上下游。>
+## 项目与版本边界
+- 仓库/模块：...
+- 当前分支/提交：...
+- 项目说明：`AGENTS.md:...`
 
 ## 代码调用链
-
-| 层级 | 位置 | 证据 |
+| 层级/职责 | 位置 | 证据 |
 |---|---|---|
-| 路由 | `file:line` | `METHOD /path` |
-| Handler | `file:line` | `FuncName` |
-| Service | `file:line` | `MethodName` |
-| Repository/外部依赖 | `file:line` | 表/Redis/API |
-| 前端 API | `file:line` | `func()` |
-| 页面/组件 | `file:line` | 实际渲染组件 |
+| 入口 | `file:line` | route/command/event |
+| 编排/领域 | `file:line` | function/class |
+| 数据/外部依赖 | `file:line` | DB/cache/queue/API |
+| 客户端调用 | `file:line` | function/query |
+| 页面/输出 | `file:line` | 实际生效组件/模板 |
 
-## 前端入口
+## 用户入口
+**角色/调用方与路径**：<导航、URL、CLI 或 API 入口>
 
-**角色与菜单路径**：<角色> → <菜单组> → <菜单项> → <页面> → <交互元素>
+### 可见字段/接口证据
+| key/字段/硬编码 | 中文/值 | English/类型 | 位置 |
+|---|---|---|---|
+| `key` | 文案 | Text | `file:line` |
 
-### UI 字段证据
-
-| i18n key/硬编码 | 中文 | English | 类型 | 位置 |
-|---|---|---|---|---|
-| `key` | 文案 | Text | 按钮 | `zh.ts:1 / en.ts:1 / View.vue:1` |
-
-## 生效树判定
-
-- 实际路由/import：...
-- 被排除的同名候选：...（原因）
+## 生效路径判定
+- 实际注册/import/config：...
+- 被排除候选：...（原因）
 
 ## QA Checklist
-
 ### Golden Path
 - [ ] ...
-
 ### 边界条件
 - [ ] ...
-
-### 异常场景
+### 异常与恢复
 - [ ] ...
-
-### 权限场景
+### 权限/开关
 - [ ] ...
-
 ### 回归点
 - [ ] ...
 
-## 复现路径
-
-1. 以 `<角色>` 登录
-2. 点击 `<用户可见菜单文案>`
-3. 操作 `<按钮/字段文案>`
-4. 观察 `<明确结果>`
+## 复现或调用路径
+1. ...
 
 ## 未确认项
-
-- 未找到/多候选/需产品确认的内容
+- ...
 ```
+
+对不适用的表格或章节可删减，但必须说明没有 UI、没有后端或没有 i18n，而不是留出虚构内容。
 
 ## 完成前检查
 
-- [ ] 找到唯一真实路由和渲染树，或明确列出候选。
-- [ ] 后端调用链没有跨层误判。
-- [ ] 至少给出一个用户可见字段证据；纯后端任务明确说明无 UI。
-- [ ] i18n 文案真实存在，带文件:行号。
-- [ ] QA 覆盖成功、边界、异常、权限和回归。
-- [ ] 不把推断写成事实。
+- [ ] 已读取适用的项目说明。
+- [ ] 找到唯一真实注册/渲染/调用路径，或明确列出候选。
+- [ ] 使用项目真实架构名称，没有跨层误判。
+- [ ] 至少给出一个用户可见或调用者可观察的证据。
+- [ ] 历史结论已对照当前 checkout。
+- [ ] QA 覆盖成功、边界、异常、权限/开关和回归。
+- [ ] 推断、未找到项和事实明确区分。

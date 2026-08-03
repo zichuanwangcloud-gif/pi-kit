@@ -18,7 +18,16 @@ import {
 
 const STATE_ENTRY = "engineering-loop-state";
 const CARD_ENTRY = "engineering-loop-card";
-const PROTECTED_BRANCHES = new Set(["main", "dev", "test"]);
+const COMMON_PROTECTED_BRANCHES = new Set([
+	"main",
+	"master",
+	"trunk",
+	"dev",
+	"develop",
+	"test",
+	"staging",
+	"production",
+]);
 const EXTERNAL_OR_DESTRUCTIVE = [
 	/\bgit\s+push\b/i,
 	/\bgit\s+(?:reset\s+--hard|clean\b|stash\b)/i,
@@ -40,6 +49,15 @@ function isInside(root: string, target: string): boolean {
 	const normalizedRoot = resolve(root);
 	const normalizedTarget = resolve(root, target.replace(/^@/, ""));
 	return normalizedTarget === normalizedRoot || normalizedTarget.startsWith(`${normalizedRoot}${sep}`);
+}
+
+function referencedPathOutside(root: string, command: string): string | undefined {
+	const matches = command.matchAll(/(?:^|[\s"'=;&|])(@?\/(?:home|opt|workspace|workspaces)\/[^\s"';&|]+)/gi);
+	for (const match of matches) {
+		const path = match[1].replace(/[),]+$/, "");
+		if (!isInside(root, path)) return path;
+	}
+	return undefined;
 }
 
 function stateLabel(state: EngineeringLoopState): string {
@@ -177,10 +195,11 @@ export default function engineeringLoop(pi: ExtensionAPI) {
 					reason: `Engineering Loop 禁止通过 cd 离开启动目录 ${state.cwd}；请使用启动目录内的相对路径。`,
 				};
 			}
-			if (state.cwd !== "/opt/CloudRouter" && /\/opt\/CloudRouter(?:\/|\s|$)/.test(command)) {
+			const outsidePath = referencedPathOutside(state.cwd, command);
+			if (outsidePath) {
 				return {
 					block: true,
-					reason: "Engineering Loop 正在 worktree 中运行，禁止命令引用 /opt/CloudRouter 主工作区。",
+					reason: `Engineering Loop 禁止命令引用启动目录之外的绝对路径：${outsidePath}`,
 				};
 			}
 		}
@@ -199,7 +218,7 @@ export default function engineeringLoop(pi: ExtensionAPI) {
 		processingSettled = true;
 		try {
 			const branch = await currentBranch(pi, state.cwd);
-			if (!branch || branch !== state.branch || PROTECTED_BRANCHES.has(branch)) {
+			if (!branch || branch !== state.branch || COMMON_PROTECTED_BRANCHES.has(branch)) {
 				transition(ctx, "paused", `Git 分支已从 ${state.branch} 变为 ${branch || "未知"}，安全暂停`);
 				return;
 			}
@@ -276,7 +295,7 @@ export default function engineeringLoop(pi: ExtensionAPI) {
 				ctx.ui.notify("Engineering Loop v0.1 只能在 Git 仓库中运行", "error");
 				return;
 			}
-			if (PROTECTED_BRANCHES.has(branch)) {
+			if (COMMON_PROTECTED_BRANCHES.has(branch)) {
 				ctx.ui.notify(`当前分支是受保护分支 ${branch}；请进入 feature/fix worktree 后启动 Loop`, "error");
 				return;
 			}
@@ -349,7 +368,7 @@ export default function engineeringLoop(pi: ExtensionAPI) {
 				return;
 			}
 			const branch = await currentBranch(pi, ctx.cwd);
-			if (branch !== state.branch || PROTECTED_BRANCHES.has(branch)) {
+			if (branch !== state.branch || COMMON_PROTECTED_BRANCHES.has(branch)) {
 				ctx.ui.notify(`Loop 启动分支为 ${state.branch}，当前分支为 ${branch || "未知"}，拒绝恢复`, "error");
 				return;
 			}

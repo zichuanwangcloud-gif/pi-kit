@@ -1,274 +1,296 @@
 ---
 name: linear-to-pr
-description: 只给一个 Linear 编号（如 CR-1170、#1170 或裸数字 1170），读取正文和全部评论/PRD，确认需求理解后基于最新 origin/dev 创建隔离 worktree，完成实现与验证，并自动提交、推送功能分支、向 dev 创建 PR。用于“linear”“CR-编号”“拿 issue 做需求”“按编号开发”“issue to pr”“编号开工”等请求。
-compatibility: Requires git, Node.js 18+, authenticated gh CLI, and LINEAR_API_KEY or ~/.config/pi/linear-api-key. Designed for the CloudRouter repository.
+description: 根据一个 Linear Issue 标识读取正文、全部评论、附件和需求文档，输出可追溯的理解卡；用户确认后从目标仓库已确认的远程基线创建隔离 worktree，完成实现、验证、提交、任务分支 push 和 PR。用于“按 Linear 开发”“Issue to PR”“拿 TEAM-123 开工”等请求。
+compatibility: Requires git, Node.js 18+, authenticated gh CLI, and LINEAR_API_KEY or ~/.config/pi/linear-api-key. The target repository must have an origin remote and an identifiable PR base branch.
 allowed-tools: read bash edit write invoke_skill
 metadata:
-  source: /opt/CloudRouter/.claude/skills/clouditera/linear-to-pr/SKILL.md
-  pi-port: "2"
+  category: issue-to-pr
+  portability: project-agnostic
 ---
 
-# linear-to-pr：从 Linear 编号到 dev PR
+# Linear to PR：从 Issue 到 Pull Request
 
-输入一个 Linear 编号，完成“读取需求 → 理解闸门 → 用户确认一次 → 隔离开发 → 验证 → 自动提交并推送功能分支 → 自动创建 dev PR”。理解卡确认后，不再为 push 和创建 PR 二次询问。
+输入一个 Linear identifier，完成：
 
-此版本专用于 Pi：
+```text
+读取需求 → 审阅全部评论/文档 → 定位代码 → 理解闸门 → 用户确认一次
+→ 从已确认远程基线创建 worktree → 实现与验证 → 提交并推送任务分支 → 创建 PR
+```
 
-- Pi 没有内置 MCP，使用 `scripts/fetch-linear-issue.mjs` 调 Linear GraphQL API。
-- 使用 Pi 的 `read`、`bash`、`edit`、`write` 工具，不使用 Claude 的 `Grep`、`Glob`、`Skill` 或 `mcp__linear__*`。
-- 不依赖 Claude memory 中的 `[[wiki links]]`；所有关键约束均写在本文件中。
-- 不写 Claude 专属署名。提交和 PR 只描述真实变更。
+理解卡和实施计划确认后，不再为本任务分支的普通 push 和 PR 创建二次询问。
 
-## 输入
+## 输入与可变参数
 
-接受以下格式：
+接受：
 
-- `CR-1170`
-- `1170`
-- `#1170`
+- 完整 identifier：`ENG-123`、`APP-42`
+- 裸数字或 `#数字`：仅当 `LINEAR_TEAM_KEY` 已配置，或用户在同一请求中明确 team key
+- 可选 base：`--base develop`
 
-团队 key 固定为 `CR`。将裸数字和 `#数字` 归一化为 `CR-<数字>`。如果输入无法唯一解析为一个编号，先询问用户。
+示例：
+
+```text
+/skill:linear-to-pr ENG-123 --base develop
+/skill:linear-to-pr 123             # 需要 LINEAR_TEAM_KEY
+```
+
+不要假定团队 key、base branch、branch prefix、worktree 根目录、commit scope 或测试命令。如果输入无法唯一解析，先询问。
+
+## 项目约定解析顺序
+
+所有可变约定按以下优先级确定：
+
+1. 用户在当前请求中的明确参数或说明。
+2. 目标仓库根目录/目标模块的 `AGENTS.md`、`CLAUDE.md`、`CONTRIBUTING*`、PR 文档。
+3. Git/托管平台证据，例如 `origin/HEAD`、现有 open PR 的 base、当前分支关系。
+4. 安全默认；若仍不唯一，询问用户。
+
+将每个最终采用的约定及证据写入实施计划，尤其是 base、受保护分支、任务分支命名和验证命令。
 
 ## 必须遵守的安全规则
 
-1. **绝不直接 push `main`、`dev` 或 `test`，绝不对任何受保护分支 force push。**
-2. 日常功能和修复只能从最新 `origin/dev` 创建 `feature/*` 或 `fix/*` 分支，并通过 PR 合入 `dev`。
-3. `test` 只读；不要在 `test` 上开发或提交。
-4. 必须先运行 `git fetch origin dev`，worktree base 必须显式为 `origin/dev`，不能使用可能过期的本地 `dev`。
-5. 必须在独立 worktree 中修改代码。不得修改主仓库工作区，不得清理、stash、reset 或覆盖用户已有改动。
-6. 进入 worktree 后，所有读写和构建都使用该 worktree 内的路径。禁止用 `/opt/CloudRouter/...` 指向主工作区文件。
-7. 需求不清、代码中找不到对应功能、存在多个候选落点或需要产品选型时，必须停下来询问，不能猜。
-8. 用户确认需求理解卡和实施计划，即视为授权本 Skill 在验证通过后自动提交、推送当前任务的 `feature/*`/`fix/*` 分支并创建到 `dev` 的 PR；不得在完成实现后再次等待 push/PR 确认。该授权不包括 force push、合并 PR、直推受保护分支、回写 Linear、部署或其他外部动作。回写 Linear 仍必须单独征得用户同意。
-9. 不打印、记录或提交 `LINEAR_API_KEY`。不得把凭据写入仓库。
-10. 遵守仓库根目录及目标模块的 `AGENTS.md` / `CLAUDE.md`。后端保持 handler → service → repository 分层。
-11. **必须阅读全部 Linear 评论。** 评论可能包含 PRD、验收标准、产品澄清、原型链接和对正文的修订；未审阅完整评论时间线、附件及相关 PRD 链接前禁止开工。
+1. **绝不直接 push 已确认的受保护分支，绝不 force push。** 至少将 `main`、`master` 和已确认 PR base 视为受保护；项目文档或远程规则列出的其他分支也同样保护。
+2. 必须先 fetch 已确认 base，并显式从 `origin/<base>` 创建任务分支和独立 worktree，不能使用可能过期的本地分支。
+3. 不得修改主工作区，不得清理、stash、reset 或覆盖用户已有改动。主工作区 dirty 可以继续，但必须报告并保持隔离。
+4. 进入 worktree 后，所有读写和构建都使用该 worktree 内路径。禁止用主工作区绝对路径读写目标项目。
+5. 需求、base、真实代码落点、架构约束或验收不清时停止询问，不能猜。
+6. 用户确认理解卡和实施计划，即授权验证通过后自动提交、普通 push 当前任务分支并创建到已确认 base 的 PR。授权不包括 force push、直推受保护分支、合并/approve/ready PR、回写 Linear、部署或其他未说明的外部动作。
+7. 不打印、记录或提交 API key。凭据不得写入仓库、PR body 或聊天。
+8. 必须阅读全部 Linear 评论，并审阅附件和决定实现的需求文档；未完成前禁止开工。
+9. 遵守仓库和目标模块说明。使用项目真实架构，不强加固定分层。
+10. 自动化失败时保留 worktree、分支和 commit，报告真实状态，不用更危险的操作兜底。
 
 ## Step 0：环境与仓库预检
 
-先检查，不做破坏性处理：
+只检查，不做破坏性处理：
 
 ```bash
 git rev-parse --show-toplevel
 git status --short --branch
 git remote -v
+git symbolic-ref --quiet --short refs/remotes/origin/HEAD || true
 gh auth status
 node --version
+find .. -name AGENTS.md -o -name CLAUDE.md
 ```
+
+还应查找当前仓库适用的 `CONTRIBUTING*` 和 PR 文档并用 `read` 阅读。
 
 要求：
 
-- 当前仓库是 CloudRouter。
-- `origin` 指向预期仓库。
-- `gh` 已认证。
+- 当前目录位于用户想修改的目标仓库；不以仓库名称硬编码判断。
+- `origin` 指向用户预期 remote；若有多个 remote 或托管目标不清，询问。
+- `gh` 已认证且目标托管在 GitHub；否则说明当前 Skill 的 PR 创建步骤不兼容并停止。
 - Node.js ≥ 18。
-- 主工作区即使有未提交改动也可以继续创建 worktree，但必须报告并保证完全不触碰这些改动。
+- 主工作区状态已记录且后续不触碰其改动。
 
 Linear 凭据按以下顺序读取：
 
-1. 环境变量 `LINEAR_API_KEY`
-2. `LINEAR_API_KEY_FILE` 指定的文件
+1. `LINEAR_API_KEY`
+2. `LINEAR_API_KEY_FILE`
 3. `~/.config/pi/linear-api-key`
 
-缺少凭据时停止，并提示用户配置；不要索要用户把密钥直接发进聊天。
+裸数字的默认 team key 只来自 `LINEAR_TEAM_KEY`，未配置就询问用户提供完整 identifier。不要索要用户把 key 直接发进聊天。
 
-推荐配置方式：
+## Step 1：读取 Linear Issue
 
-```bash
-mkdir -p ~/.config/pi
-chmod 700 ~/.config/pi
-read -rsp "Linear API key: " LINEAR_API_KEY; echo
-umask 077
-printf '%s' "$LINEAR_API_KEY" > ~/.config/pi/linear-api-key
-unset LINEAR_API_KEY
-```
-
-## Step 1：读取 Linear issue
-
-Pi 加载 Skill 时会提供 Skill 文件位置。将辅助脚本解析为该 Skill 目录下的：
+辅助脚本路径相对于本 Skill：
 
 ```text
 scripts/fetch-linear-issue.mjs
 ```
 
-运行时写入临时文件，避免长评论被终端的 50KB/2000 行输出限制截断：
+使用完整 identifier，输出到临时文件，避免终端截断：
 
 ```bash
-ISSUE=CR-1170
+ISSUE=ENG-123
 OUT="/tmp/${ISSUE,,}-linear.json"
 node <skill目录>/scripts/fetch-linear-issue.mjs "$ISSUE" > "$OUT"
 ```
 
-随后必须用 `read` 分段读取 `$OUT` 直到文件末尾；不能只读开头或仅用 `jq` 摘要替代正文审阅。可以用 `jq` 生成索引帮助导航，但最终必须读取全部 `comments[].body`。任务结束时可删除该临时文件。
+随后用 `read` 分段读取 `$OUT` 到文件末尾。可用 `jq` 建索引，但不能用摘要替代对正文和全部 `comments[].body` 的阅读。
 
-脚本会分页拉取全部评论和附件，并按时间顺序返回 JSON，主要字段包括：
+脚本返回：
 
-- `description`：issue 正文。
-- `comments`：完整评论时间线；每条含 `sequence`、作者、时间、正文、链接、`requirementSignals` 和 `isRequirementRelevant`。
-- `commentCount`：评论总数。必须与实际审阅数量一致。
-- `requirementRelevantComments`：命中 PRD、需求、期望、验收、修订、结论、原型等信号的候选评论。它只是审阅优先级提示，**不能替代阅读全部评论**。
-- `documentLinks`：从正文、全部评论和附件中汇总的链接，并标记来源及是否可能是 PRD/设计文档。
-- `attachments`：全部 issue 附件。
+- `description`
+- 按时间排序的完整 `comments`
+- `commentCount`
+- 只作导航提示的 `requirementRelevantComments`
+- `documentLinks`
+- `attachments`
+- 分页完整性元数据
 
-若请求失败：
+失败处理：
 
-- `401/403`：提示检查 Linear API key 权限。
-- `not found`：确认团队 key 和编号，不要改成相近 issue。
-- 网络错误：报告错误并停止，不得根据本地记忆臆造 issue。
+- `401/403`：提示检查 API key 权限。
+- `not found`：确认 identifier，不选择相近 Issue。
+- 网络/分页错误：报告并停止，不根据记忆补全。
 
-拿到数据后不要立即改代码，先完成以下评论/PRD 审阅和理解闸门。
+### Step 1.1：评论、附件和文档审阅（硬闸门）
 
-### Step 1.1：评论、附件和 PRD 审阅（硬闸门）
+1. 先读正文，再按 `sequence` 从旧到新阅读每条评论。
+2. 建立需求时间线：最初描述、关键补充、验收、链接、后续修订和最终结论。
+3. 对潜在 PRD、原型、设计或验收文档：可访问则读取相关内容；登录墙、私有文档、过期附件明确列为缺口。不能凭标题猜内容。
+4. 有冲突时列出双方摘要、作者、时间和来源。新评论只有明确覆盖证据时才作为候选最终口径；否则询问。
+5. 评论出现新范围但未明确纳入当前 Issue 时，作为范围疑问。
 
-1. 先读 issue 正文，再按 `sequence` 从旧到新阅读**每一条**评论；不能只读 `isRequirementRelevant=true` 的候选评论。
-2. 建立“需求时间线”，至少记录：
-   - issue 正文最初描述；
-   - 产品/设计/开发/测试各自的关键补充（保留作者和时间）；
-   - PRD、原型、截图、验收说明、关联 PR 等链接；
-   - 后续对旧方案的否定、修订和最终结论。
-3. 对 `documentLinks` 中可能是 PRD、原型或设计文档的链接：
-   - 在当前环境可访问时读取与本 issue 相关的内容；
-   - 私有文档、登录墙、过期附件或不可访问链接必须明确列为缺口，请用户提供可访问内容或关键摘录；
-   - 不得仅凭链接标题猜测 PRD 内容。
-4. 评论与正文发生冲突时：
-   - 后续明确澄清可以作为“候选最新口径”，但不能只凭时间自动认定谁有权覆盖谁；
-   - 输出冲突双方的原话摘要、作者、时间和链接/评论序号；
-   - 只有“产品明确说以新方案为准”等证据充分时才按新口径理解，否则必须询问用户。
-5. 评论中出现新的需求范围但没有明确说是否纳入当前 issue 时，列为范围疑问，不能顺手实现。
-6. 输出评论审阅摘要：
+输出：
 
 ```text
-【CR-N 评论/PRD 审阅】
+【TEAM-N 评论/文档审阅】
 评论总数：N（已审阅 N）
 关键时间线：
-- [正文][时间] …
-- [评论 #3][作者][时间] …
-- [评论 #8][作者][时间] …
-PRD/原型/附件：
+- [正文][时间] ...
+- [评论 #3][作者][时间] ...
+文档/原型/附件：
 - [已读取|无法访问] <标题或 URL> — 与需求的关系
 冲突与修订：
-- 无；或：旧口径 … ↔ 新口径 …，当前依据/待确认项 …
+- 无；或：旧口径 ... ↔ 新口径 ...，当前依据/待确认项 ...
 ```
 
-只要“已审阅数 != `commentCount`”、关键 PRD 无法访问且其内容决定实现、或冲突未解决，就不能进入实施。
+只要已审阅数不等于 `commentCount`、分页不完整、决定实现的文档无法访问，或冲突未解决，就不能实施。
 
 ## Step 1.5：需求理解闸门
 
-### 1.5.a 代码定位
+### 1.5.a 定位真实代码路径
 
-使用 Pi 工具定位真实执行路径：
+使用 `bash` 搜索、`read` 阅读：
 
-- 用 `bash` + `rg --files` / `rg -n` 查找关键词、路由、页面、API、handler、service。
-- 用 `read` 阅读命中文件，不要用 `cat`/`sed` 代替。
-- 前端至少确认：路由入口 → 实际渲染页面/组件 → 用户可见字段。
-- 后端至少确认：路由 → handler → service；涉及数据访问时继续定位 repository。
-- CloudRouter 可能存在上游原组件与 `clouditera` 影子组件两棵树，必须沿实际路由/import 确认真正渲染的文件，不能只按同名文件猜测。
-
-可按需显式调用已安装的 `feature-trace` Skill；如果它没有安装，直接按上述方法定位，不得因此跳过落点确认。
+- 从项目真实入口追踪 route/command/event/job 到业务与数据/外部依赖。
+- 有 UI 时确认路由/导航 → 实际渲染组件 → 用户可见字段。
+- 存在旧版/新版、平台覆写、feature flag 或同名候选时，沿注册/import/config 判定实际生效路径。
+- 可按需调用 `feature-trace`；未安装时自行完成，不能跳过。
 
 ### 1.5.b 输出理解卡
 
-每格必须标注精确来源：`[正文]`、`[评论 #序号/作者/日期]`、`[PRD/链接]`、`[代码证据 文件:行]` 或 `[推断]`。不能只写笼统的 `[评论]`：
+每项附精确来源：`[正文]`、`[评论 #序号/作者/日期]`、`[文档/URL]`、`[代码 文件:行]` 或 `[推断]`。
 
 ```text
-【CR-N 理解卡】
-现象（用户实际看到什么）：      … [正文|评论 #N/作者/日期|PRD]
-复现路径（页面/角色/操作）：     … [正文|评论 #N/作者/日期|PRD]
-期望（改完应变成什么）：        … [正文|评论 #N/作者/日期|PRD]
-验收标准（怎么算修好）：        … [正文|评论 #N/作者/日期|PRD]
-影响面（关联角色/协议/模块）：   … [正文|评论 #N/作者/日期|PRD|推断]
-落点（拟改文件/组件/调用链）：   … [代码证据 文件:行]
-最终需求口径：                   … [说明正文/哪条评论/哪个 PRD 为依据]
+【TEAM-N 理解卡】
+现象/动机：                     ... [来源]
+复现或触发路径：                ... [来源]
+期望：                          ... [来源]
+验收标准：                      ... [来源]
+影响面：                        ... [来源|推断]
+真实代码落点/调用链：           ... [代码 文件:行]
+最终需求口径：                  ... [采用依据]
 ```
 
-同时逐项检查：
+逐项检查：
 
-- issue 正文或评论/PRD 是否明确写出期望结果，而不只是现象？
-- 正文、全部评论、附件和关键 PRD 是否均已审阅？
-- 正文与评论、评论之间、评论与 PRD 之间是否不存在未解决冲突？
-- 是否有验收标准？
-- 是否能在代码中定位到唯一生效落点？
-- 是否有复现步骤或触发条件？
+- 期望是否明确，而不只有现象？
+- 正文、全部评论、附件和关键文档是否审阅完？
+- 冲突是否解决？
+- 是否有可验证验收标准？
+- 是否定位唯一生效落点？
+- 是否知道触发条件？
 
-分级处理：
+处理：
 
-- **0 个缺口**：回显理解卡和实施计划，请用户轻确认后开工。
-- **1–2 个缺口**：列出缺口和带 `[推断]` 的假设，让用户选择补充信息或明确同意按假设推进。
-- **≥3 个缺口，或“期望/落点”全是推断**：必须停止，不能开工。
+- 0 个缺口：回显理解卡和计划，请用户轻确认。
+- 1–2 个缺口：列缺口及带 `[推断]` 的假设，让用户补充或明确同意。
+- ≥3 个缺口，或期望/落点主要依赖推断：停止。
 
-如果用户明确要求按假设推进，必须把假设写入 PR body，供 reviewer 审计。
+用户明确按假设推进时，将假设写入 PR body。
 
-## Step 2：制定实现和验证计划
+## Step 2：确定 Git 约定与实施计划
+
+### 2.a 确定 base
+
+优先使用显式 `--base`。否则：
+
+1. 查项目文档是否明确开发/PR base。
+2. 获取远程默认分支（只读）：
+
+```bash
+git symbolic-ref --quiet --short refs/remotes/origin/HEAD || true
+gh repo view --json defaultBranchRef
+```
+
+若 `origin/HEAD` 未配置，只把它记为信息缺口；不要为了探测运行会修改本地 remote 配置的命令。
+3. 必要时查看少量 open PR 的 base 作为辅助证据，但不能仅凭数量覆盖明确文档。
+4. 默认分支不一定是日常开发 base；证据冲突或发布流复杂时询问。
+
+### 2.b 确定任务分支和 worktree
+
+- 遵循项目命名规则。
+- 无规则时使用中性安全默认：`feature/<issue-lower>-<slug>` 或 `fix/<issue-lower>-<slug>`；类型不清则询问。
+- worktree 默认放在主仓库父目录，名称取 `<repo>-<issue-lower>`；先用 `git worktree list` 和 `test ! -e` 验证唯一性。
+- 不硬编码 `/opt`、`~/git` 或仓库名称。
 
 计划至少包括：
 
-- 分支类型：Bug 用 `fix/cr-<n>-<slug>`，功能用 `feature/cr-<n>-<slug>`；判断不清时询问用户。
-- 唯一 worktree 路径。
-- 预计修改文件和分层。
-- 测试、编译、lint/typecheck 命令。
-- 是否涉及 Ent、Wire、migration、overlay 受控例外或生成文件。
+- base 及证据、保护分支集合
+- branch 和唯一 worktree 路径
+- 预计修改文件/职责层
+- 测试、构建、lint/typecheck 命令及来源
+- schema/migration、依赖注入、生成文件等特殊步骤
+- 自动 push/PR 的授权复述
 
-不要在确认前修改业务代码。
+用户确认前不修改业务代码、不创建 worktree。
 
-## Step 3：从 origin/dev 创建隔离 worktree
+## Step 3：创建隔离 worktree
 
-在主仓库根目录运行：
+在主仓库根目录，用确认后的值：
 
 ```bash
-git fetch origin dev
-BR="fix/cr-1170-short-slug"       # 或 feature/...
-WT="/opt/CloudRouter-cr-1170"     # 必须是新的、唯一的路径
+BASE="develop"
+BR="fix/eng-123-short-slug"
+ROOT=$(git rev-parse --show-toplevel)
+REPO=$(basename "$ROOT")
+WT="$(dirname "$ROOT")/${REPO}-eng-123"
 
+git fetch origin "$BASE"
+git show-ref --verify --quiet "refs/remotes/origin/$BASE"
 git show-ref --verify --quiet "refs/heads/$BR" && echo "branch exists"
 git worktree list --porcelain
 test ! -e "$WT"
-git worktree add -b "$BR" "$WT" origin/dev
+git worktree add -b "$BR" "$WT" "origin/$BASE"
 ```
 
-如果分支或路径已存在，停止并让用户决定复用、换名或清理；不要自行删除已有 worktree/branch。
+如果 branch/path 已存在，停止并让用户决定复用、换名或清理；不要自行删除。
 
-创建后验证：
+进入后验证：
 
 ```bash
 cd "$WT"
 git status --short --branch
-git merge-base --is-ancestor origin/dev HEAD
+git merge-base --is-ancestor "origin/$BASE" HEAD
 ```
 
-之后所有代码操作都必须在 `$WT` 内进行。每次调用工具时明确设置工作目录，避免回到主工作区。
-
-如果前端需要依赖，可以在确认安全后复用主仓库依赖目录的只读/符号链接方案；不要未经检查就重复安装或修改主工作区依赖。
+之后每次工具调用都以 `$WT` 为工作目录。依赖复用、符号链接或安装必须先遵守项目说明，不能修改主工作区依赖状态。
 
 ## Step 4：实施
 
-- 先阅读目标模块附近现有代码和测试，遵循既有模式。
-- 使用 `edit` 做精确修改；新文件用 `write`。
-- 修改多个独立位置时，尽量一次 `edit` 提交多个不重叠替换。
-- 不做与 issue 无关的重构或格式化。
-- Go 后端保持 handler → service → repository；handler 不直连 repository，service 不直连数据库/Redis 实现。
-- 日志使用项目 logger，响应使用统一 response 包。
-- 修改 Ent schema 后按仓库规范执行 `go generate ./ent`。
-- 修改 Wire 依赖后按仓库规范执行 `wire ./cmd/server/`；如果目标模块有 overlay/wire_gen 特殊约束，先读相关文档并遵守，不要盲目重生成。
-- migration 必须新增递增/时间戳文件，不改已发布 migration。
-- `gofmt` 仅作用于本次修改的 Go 文件，禁止整目录格式化。
+- 阅读目标代码和相邻测试，遵循既有模式。
+- 使用 `edit` 精确修改，新文件使用 `write`。
+- 不做无关重构、全仓格式化或依赖升级。
+- 保持项目实际架构边界和错误/日志/响应约定。
+- schema、migration、代码生成和依赖注入按项目文档执行；不修改已发布 migration。
+- 格式化只覆盖本任务文件，除非项目工具无法缩小范围且用户已知情。
 
 ## Step 5：验证
 
-按改动范围执行最小针对性测试，再执行模块级构建。CloudRouter 常用命令：
+从项目配置和计划执行最小针对性验证，再执行合理的模块级验证。技术栈示例仅供选择：
 
 ```bash
-# 后端：在对应 backend 目录
-# 单元测试若项目使用 unit build tag，必须带 -tags=unit
-go test -tags=unit ./path/to/changed/package/...
+# JavaScript/TypeScript（以 package scripts 为准）
+npm test -- <target>
+npm run build
+
+# Go
+go test ./path/to/package/...
 go build ./...
 
-# 前端：从 workspace 根目录或目标 package
-pnpm --filter <package> test -- <target>
-pnpm --filter <package> build
+# Rust
+cargo test -p <package>
+cargo check -p <package>
+
+# Python
+pytest <target>
 ```
 
-实际命令以目标模块的 `package.json`、Makefile、AGENTS.md/CLAUDE.md 为准。
-
-验证结束后检查：
+结束检查：
 
 ```bash
 git status --short
@@ -277,11 +299,11 @@ git diff --stat
 git diff
 ```
 
-必须报告：运行了哪些命令、哪些通过、哪些未运行及原因。失败不得隐瞒。
+报告所有已运行、通过、失败和未运行项。测试失败且不能证明与本改动无关时停止，不提交/推送。
 
-## Step 6：自动提交并推送功能分支
+## Step 6：自动提交并推送任务分支
 
-提交前确认：
+提交前确认当前分支等于计划中的 `$BR`，且不在保护集合中：
 
 ```bash
 git branch --show-current
@@ -289,55 +311,51 @@ git status --short --branch
 git diff --check
 ```
 
-当前分支必须是本任务的 `feature/*` 或 `fix/*`，绝不能是 `dev`、`main`、`test`。
-
-只暂存本任务文件，核对 staged diff 后提交：
+只暂存任务文件并审阅 staged diff：
 
 ```bash
-git add <本任务文件...>
+git add <task-files...>
 git diff --cached --stat
 git diff --cached
-git commit -m "<type>(cv2): <简述> (CR-1170)"
+git commit -m "<project-conventional-message> (<ISSUE>)"
 ```
 
-不要自动添加虚假或不适用的 Co-Authored-By。
+commit 格式和 scope 来自项目规范；没有规范时使用简洁、真实的描述。不要添加虚假署名。
 
-提交成功后无需再次询问，立即推送当前任务分支：
+确认后无需再次询问，普通推送任务分支：
 
 ```bash
 git push -u origin "$BR"
 ```
 
-禁止 `--force`，禁止使用 refspec 把当前提交推到 `dev/main/test`。如果 push 失败，保留 worktree 和 commit，报告完整错误并停止；不得改用 force push。
+禁止 `--force`，禁止 refspec 指向 base 或其他保护分支。push 失败时保留状态并停止。
 
-## Step 7：自动创建到 dev 的 PR
+## Step 7：自动创建到已确认 base 的 PR
 
-push 成功后无需再次询问，立即检查当前分支是否已有 PR：
+先检查已有 PR：
 
 ```bash
 gh pr view "$BR" --json url,baseRefName,headRefName,state 2>/dev/null || true
 ```
 
-处理规则：
-
-- 已有 `OPEN` PR 且 `baseRefName=dev`、`headRefName=$BR`：复用该 PR，并按当前提交更新最终报告；不要重复创建。
-- 已有 PR 但 base/head 不正确，或状态为 `MERGED`/`CLOSED`：停止并报告，不得自行重开、改 base 或另建重复 PR。
-- 不存在 PR：自动创建：
+- 已有 OPEN PR 且 base/head 正确：复用，不重复创建。
+- 已有 PR 但 base/head 不正确，或状态 CLOSED/MERGED：停止并报告；不擅自重开、改 base 或建重复 PR。
+- 不存在：
 
 ```bash
-gh pr create --base dev --head "$BR" \
-  --title "<type>(cv2): <简述> (CR-1170)" \
-  --body-file /tmp/cr-1170-pr-body.md
+gh pr create --base "$BASE" --head "$BR" \
+  --title "<project-style title> (<ISSUE>)" \
+  --body-file "/tmp/${ISSUE,,}-pr-body.md"
 ```
 
-PR body 使用：
+PR body：
 
 ```markdown
 ## 关联
-- Linear: CR-1170 <issue URL>
+- Linear: TEAM-123 <issue URL>
 
 ## 需求理解
-- 现象：...
+- 现象/动机：...
 - 期望：...
 - 验收标准：...
 
@@ -349,36 +367,43 @@ PR body 使用：
 - 未执行：...（原因）
 
 ## 假设
-<!-- 仅在用户明确同意“按假设推进”时保留 -->
-> 本 PR 基于以下推断；若不符合产品意图，请驳回：
+<!-- 仅在用户明确同意按假设推进时保留 -->
 - ...
 ```
 
-创建后必须再次运行 `gh pr view "$BR" --json url,baseRefName,headRefName,state`，确认 `state=OPEN`、`baseRefName=dev`、`headRefName=$BR`。创建失败时报告命令错误和已推送分支地址，不得把“分支已推送”误报成“PR 已创建”。不要自动合并、approve 或 ready PR。
+再次运行：
 
-回写 Linear 评论或状态必须另行征得用户同意。Pi 版默认不提供写入 Linear 的辅助脚本，避免无意对外修改；如获同意，可使用 Linear GraphQL mutation，但必须先展示拟写内容。
+```bash
+gh pr view "$BR" --json url,baseRefName,headRefName,state
+```
+
+确认 `state=OPEN`、`baseRefName=$BASE`、`headRefName=$BR`。创建失败时报告错误和已推送分支，不把 push 成功误报成 PR 成功。不要自动 merge、approve 或 ready。
+
+回写 Linear 评论/状态需另行征得用户同意，并先展示拟写内容。
 
 ## Step 8：收尾报告
 
 输出：
 
-- Linear issue 编号、标题和 URL。
-- 分支、worktree 路径和 commit SHA。
-- PR URL、base/head。
-- 实际修改文件清单，以 `git show --stat --oneline HEAD` 为准。
-- 测试/构建结果。
-- 已知限制、未验证项和按假设推进内容。
+- Issue identifier、标题、URL
+- base 及其选择证据
+- branch、worktree、commit SHA
+- PR URL 与 base/head/state
+- `git show --stat --oneline HEAD` 对应文件清单
+- 测试/构建结果
+- 限制、未验证项和已同意的假设
 
-worktree 默认保留供 review。只有用户确认已不需要后才能清理；不得自动删除。
+worktree 默认保留。只有用户确认不再需要后才清理。
 
-## 立即停止并询问用户的情形
+## 立即停止并询问
 
-- Linear issue 无法读取或缺少关键描述。
-- 期望结果或真实代码落点无法确定。
-- 同名/相近功能存在多个生效候选。
-- 分支类型、schema/migration、数据兼容、计费、安全或权限设计存在分歧。
-- branch/worktree 路径已经存在。
-- 测试失败且无法明确证明与本改动无关。
-- 需要回写 Linear、合并/approve/ready PR、部署或执行其他未授权外部动作。
+- Issue 无法完整读取或关键需求文档不可访问。
+- team key、base、remote、分支策略无法唯一确定。
+- 期望、验收或真实代码落点不清。
+- 多个生效候选无法排除。
+- schema/migration、兼容性、计费、安全、权限或发布策略有分歧。
+- branch/worktree 已存在。
+- 测试失败且不能明确排除本改动影响。
+- 需要 Linear 回写、合并/approve/ready PR、部署或其他未授权动作。
 
-**不得停下询问的情形**：需求理解卡和计划已经获得用户确认、实现与验证已完成、当前分支和 worktree 均正常时，不得再询问“是否 push/是否创建 PR”；必须自动完成 Step 6–7。
+**不得停下重复询问**：理解卡和实施计划已获用户确认、实现与验证成功、当前任务分支/worktree 正常时，必须继续完成提交、普通 push 和创建到已确认 base 的 PR。

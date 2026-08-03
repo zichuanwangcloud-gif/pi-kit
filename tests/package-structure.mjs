@@ -7,7 +7,7 @@ const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const required = [
 	"package.json",
 	"README.md",
-	"extensions/cloudrouter-help.ts",
+	"extensions/kit-help.ts",
 	"extensions/skill-runner.ts",
 	"extensions/engineering-loop/index.ts",
 	"extensions/engineering-loop/parser.ts",
@@ -16,6 +16,7 @@ const required = [
 	"skills/feature-trace/SKILL.md",
 	"skills/linear-to-pr/SKILL.md",
 	"skills/linear-to-pr/scripts/fetch-linear-issue.mjs",
+	"docs/CONTRIBUTING.md",
 	"docs/MIGRATION.md",
 ];
 
@@ -23,20 +24,46 @@ for (const path of required) await access(resolve(root, path), constants.R_OK);
 const manifest = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
 if (!manifest.keywords?.includes("pi-package")) throw new Error("package.json is missing pi-package keyword");
 if (!manifest.pi?.extensions?.length || !manifest.pi?.skills?.length) throw new Error("Pi resource manifest is incomplete");
+if (manifest.pi.extensions.some((path) => /cloudrouter/i.test(path))) {
+	throw new Error("Pi extension manifest contains a project-specific name");
+}
 
 const linearSkill = await readFile(resolve(root, "skills/linear-to-pr/SKILL.md"), "utf8");
 const requiredAutoPrRules = [
-	"自动提交并推送功能分支",
-	"自动创建到 dev 的 PR",
-	"不得再询问“是否 push/是否创建 PR”",
-	"不要自动合并、approve 或 ready PR",
+	"自动提交、普通 push 当前任务分支",
+	"创建到已确认 base 的 PR",
+	"不得停下重复询问",
+	"不要自动 merge、approve 或 ready",
 ];
 for (const rule of requiredAutoPrRules) {
 	if (!linearSkill.includes(rule)) throw new Error(`linear-to-pr is missing auto-PR rule: ${rule}`);
 }
-const forbiddenLegacyRules = ["确认可以执行外部动作后", "需要 push、建 PR、回写 Linear"];
-for (const rule of forbiddenLegacyRules) {
-	if (linearSkill.includes(rule)) throw new Error(`linear-to-pr contains legacy confirmation rule: ${rule}`);
+
+const portableFiles = [
+	"README.md",
+	"package.json",
+	"extensions/kit-help.ts",
+	"extensions/engineering-loop/index.ts",
+	"skills/feature-trace/SKILL.md",
+	"skills/linear-to-pr/SKILL.md",
+	"skills/linear-to-pr/scripts/fetch-linear-issue.mjs",
+	"docs/CONTRIBUTING.md",
+	"docs/MIGRATION.md",
+	"docs/experience/engineering-loop.md",
+	"docs/experience/linear-to-pr.md",
+	"docs/experience/pi-extension-notes.md",
+];
+const forbiddenProjectBindings = [
+	[/CloudRouter/i, "legacy repository name"],
+	[/clouditera/i, "legacy project namespace"],
+	[/\/opt\/CloudRouter/i, "legacy absolute repository path"],
+	[/团队 key 固定为\s*`?CR`?/i, "fixed Linear team key"],
+];
+for (const path of portableFiles) {
+	const content = await readFile(resolve(root, path), "utf8");
+	for (const [pattern, label] of forbiddenProjectBindings) {
+		if (pattern.test(content)) throw new Error(`${path} contains ${label}: ${pattern}`);
+	}
 }
 
-console.log(`Package structure OK (${required.length} required files; auto-PR policy verified)`);
+console.log(`Package structure OK (${required.length} required files; portability and auto-PR policies verified)`);

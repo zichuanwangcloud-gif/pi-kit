@@ -3,17 +3,17 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Portable Pi extensions, skills, and engineering experience for CloudRouter development.",
+  "description": "Portable, project-agnostic Pi extensions, agent skills, and engineering workflows.",
   "keywords": [
     "pi-package",
-    "cloudrouter",
-    "engineering-loop",
+    "agent-skills",
+    "engineering-workflows",
     "linear"
   ],
   "license": "UNLICENSED",
   "pi": {
     "extensions": [
-      "./extensions/cloudrouter-help.ts",
+      "./extensions/kit-help.ts",
       "./extensions/skill-runner.ts",
       "./extensions/engineering-loop/index.ts"
     ],

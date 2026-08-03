@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { resolve } from "node:path";
 
 const API_URL = "https://api.linear.app/graphql";
-const DEFAULT_TEAM = "CR";
+const DEFAULT_TEAM = process.env.LINEAR_TEAM_KEY?.trim().toUpperCase() ?? "";
 const PAGE_SIZE = 50;
 const MAX_PAGES = 1000;
 
@@ -24,7 +24,8 @@ const DOCUMENT_HINT = /\bprd\b|产品|需求|验收|规格|方案|设计|原型|
 
 function usage(message) {
 	if (message) console.error(`Error: ${message}`);
-	console.error("Usage: fetch-linear-issue.mjs <CR-1170|1170|#1170>");
+	console.error("Usage: fetch-linear-issue.mjs <TEAM-123|123|#123>");
+	console.error("Bare numbers require LINEAR_TEAM_KEY, for example LINEAR_TEAM_KEY=ENG.");
 	process.exit(2);
 }
 
@@ -39,6 +40,9 @@ function parseIdentifier(input) {
 
 	const bare = value.match(/^#?(\d+)$/);
 	if (bare) {
+		if (!DEFAULT_TEAM) {
+			usage("a bare Linear issue number requires LINEAR_TEAM_KEY; otherwise pass a full identifier such as ENG-123");
+		}
 		const number = Number(bare[1]);
 		return { team: DEFAULT_TEAM, number, identifier: `${DEFAULT_TEAM}-${number}` };
 	}
