@@ -1,6 +1,6 @@
 {
   "name": "pi-kit",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Portable, project-agnostic Pi extensions, agent skills, and engineering workflows.",
@@ -8,6 +8,7 @@
     "pi-package",
     "agent-skills",
     "engineering-workflows",
+    "pull-request-audit",
     "linear"
   ],
   "license": "UNLICENSED",
@@ -28,6 +29,7 @@
     "typebox": "*"
   },
   "scripts": {
-    "check": "node --check skills/linear-to-pr/scripts/fetch-linear-issue.mjs && node tests/package-structure.mjs"
+    "check": "node --check skills/linear-to-pr/scripts/fetch-linear-issue.mjs && node tests/package-structure.mjs",
+    "test:skill": "node tests/package-structure.mjs"
   }
 }

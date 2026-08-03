@@ -16,8 +16,10 @@ const required = [
 	"skills/feature-trace/SKILL.md",
 	"skills/linear-to-pr/SKILL.md",
 	"skills/linear-to-pr/scripts/fetch-linear-issue.mjs",
+	"skills/pr-audit/SKILL.md",
 	"docs/CONTRIBUTING.md",
 	"docs/MIGRATION.md",
+	"docs/experience/pr-audit.md",
 ];
 
 for (const path of required) await access(resolve(root, path), constants.R_OK);
@@ -39,6 +41,18 @@ for (const rule of requiredAutoPrRules) {
 	if (!linearSkill.includes(rule)) throw new Error(`linear-to-pr is missing auto-PR rule: ${rule}`);
 }
 
+const prAuditSkill = await readFile(resolve(root, "skills/pr-audit/SKILL.md"), "utf8");
+const requiredAuditRules = [
+	"三个 Gate 都必须 `PASS`，即 **3 PASS**",
+	"二者都 `PASS`，即 **2 PASS**",
+	"第一版始终只输出到 Pi",
+	"不自动安装未知工具",
+	"S/A/B/C/D/F",
+];
+for (const rule of requiredAuditRules) {
+	if (!prAuditSkill.includes(rule)) throw new Error(`pr-audit is missing policy: ${rule}`);
+}
+
 const portableFiles = [
 	"README.md",
 	"package.json",
@@ -47,11 +61,13 @@ const portableFiles = [
 	"skills/feature-trace/SKILL.md",
 	"skills/linear-to-pr/SKILL.md",
 	"skills/linear-to-pr/scripts/fetch-linear-issue.mjs",
+	"skills/pr-audit/SKILL.md",
 	"docs/CONTRIBUTING.md",
 	"docs/MIGRATION.md",
 	"docs/experience/engineering-loop.md",
 	"docs/experience/linear-to-pr.md",
 	"docs/experience/pi-extension-notes.md",
+	"docs/experience/pr-audit.md",
 ];
 const forbiddenProjectBindings = [
 	[/CloudRouter/i, "legacy repository name"],
@@ -66,4 +82,4 @@ for (const path of portableFiles) {
 	}
 }
 
-console.log(`Package structure OK (${required.length} required files; portability and auto-PR policies verified)`);
+console.log(`Package structure OK (${required.length} required files; portability, auto-PR, and PR-audit policies verified)`);

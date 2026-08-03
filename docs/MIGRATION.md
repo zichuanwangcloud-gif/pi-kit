@@ -10,6 +10,7 @@ Pi Kit 可以通过 Git、Git bundle 或其他可信分发方式迁移。迁移�
 - `/skills` 和 `invoke_skill`
 - `feature-trace`
 - `linear-to-pr`
+- `pr-audit`
 - `/loop`、`/loop-status`、`/loop-pause`、`/loop-resume`、`/loop-cancel`
 - `docs/` 中的使用与维护说明
 
@@ -72,7 +73,7 @@ Pi 内：
 1. 目标仓库自己的 Agent/贡献说明。
 2. 远程默认分支和日常 PR base。
 3. 受保护分支和分支命名规则。
-4. 测试、构建、lint、代码生成命令。
+4. 测试、构建、lint、代码生成和安全扫描命令。
 5. Linear 团队 key 与 GitHub CLI 认证范围。
 
 不要把某台机器上的绝对 worktree 路径复制成团队标准。

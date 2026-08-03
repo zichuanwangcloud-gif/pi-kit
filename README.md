@@ -20,6 +20,7 @@
 | Skill 调度 | `/skills`、`invoke_skill` | 交互或由模型按任务加载已发现的 Skill |
 | 功能溯源 | `/skill:feature-trace <描述>` | 在 Web、服务端或 monorepo 中追踪真实代码路径、UI 入口、文案和测试点 |
 | Linear → PR | `/skill:linear-to-pr TEAM-123` | 完整审阅 Linear 需求，确认后在隔离 worktree 实现、验证并创建 PR |
+| PR 三门审计 | `/skill:pr-audit 123 [--linear on]` | 审计正确性、可选需求完整性和代码安全；启用 Gate 全部 PASS 后给出评级 |
 | Engineering Loop | `/loop` | 在当前非受保护分支中进行有完成条件的安全迭代 |
 
 ## 快速安装
@@ -105,6 +106,15 @@ Skill 会先探测项目结构，再按真实路由/import/调用关系追踪，
 
 确认理解卡和计划即授权最后的任务分支 push 与 PR 创建；force push、合并/approve/ready PR、回写 Linear、部署仍不在授权范围内。
 
+### PR 三门审计
+
+```text
+/skill:pr-audit 123
+/skill:pr-audit 123 --linear on
+```
+
+默认关闭 Linear 对比，仅审计 Correctness 和 Security，二者都通过即 `2/2 PASS`。开启后增加 Requirements Gate，必须 `3/3 PASS`。报告同时给出 Gate 状态、S/A/B/C/D/F 等级和合并建议；第一版只在 Pi 输出，不自动评论或修改 PR。
+
 ### Engineering Loop
 
 先进入任务分支或 worktree，再启动 Pi：
@@ -158,7 +168,7 @@ pi -e ./extensions/engineering-loop/index.ts
 4. 通用流程放在 Skill；项目专属命令和路径放在目标项目自己的说明中。
 5. 示例使用占位符或中性名称，不把单个项目约定描述为普遍规则。
 
-详见 [贡献与通用化指南](docs/CONTRIBUTING.md)、[迁移清单](docs/MIGRATION.md) 和 [经验文档](docs/experience/)。
+详见 [贡献与通用化指南](docs/CONTRIBUTING.md)、[迁移清单](docs/MIGRATION.md)、[PR Audit 设计](docs/experience/pr-audit.md) 和 [经验文档](docs/experience/)。
 
 ## 安全边界
 

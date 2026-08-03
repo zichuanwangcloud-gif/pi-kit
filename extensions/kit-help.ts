@@ -1,7 +1,7 @@
 import type { ExtensionAPI, SlashCommandInfo } from "@earendil-works/pi-coding-agent";
 import { Box, Text } from "@earendil-works/pi-tui";
 
-const HELP_TOPICS = ["overview", "installed", "skills", "linear", "loop", "roadmap", "safety"] as const;
+const HELP_TOPICS = ["overview", "installed", "skills", "linear", "audit", "loop", "roadmap", "safety"] as const;
 type HelpTopic = (typeof HELP_TOPICS)[number];
 
 type HelpSection = { title: string; lines: string[] };
@@ -155,6 +155,38 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 				paths: skills.filter((skill) => skill.name === "skill:linear-to-pr").map((skill) => skill.sourceInfo.path),
 				createdAt: Date.now(),
 			};
+		case "audit":
+			return {
+				topic,
+				title: "PR 三门审计",
+				sections: [
+					{
+						title: "入口",
+						lines: [
+							"/skill:pr-audit 123",
+							"/skill:pr-audit 123 --linear on",
+							"默认 --linear off；只在 Pi 输出，不发布 PR comment/review。",
+						],
+					},
+					{
+						title: "Gate",
+						lines: [
+							"Correctness：代码审阅、单测、lint、typecheck、编译和 CI 证据。",
+							"Requirements：可选读取 Linear 全部需求，建立需求→实现→测试矩阵。",
+							"Security：人工威胁审阅以及项目已有 secret/SAST/依赖扫描。",
+						],
+					},
+					{
+						title: "通过与评级",
+						lines: [
+							"Linear 开启要求 3/3 PASS；关闭时 Requirements=DISABLED，其余要求 2/2 PASS。",
+							"同时输出 PASS/FAIL/BLOCKED 门禁和 S/A/B/C/D/F 等级；只有 PASS + S/A 建议通过。",
+						],
+					},
+				],
+				paths: skills.filter((skill) => skill.name === "skill:pr-audit").map((skill) => skill.sourceInfo.path),
+				createdAt: Date.now(),
+			};
 		case "loop":
 			return {
 				topic,
@@ -234,6 +266,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 							"/help installed — 当前命令、Skill 和扩展工具。",
 							"/help skills — Skill 安装和调用。",
 							"/help linear — 通用 Linear 到 PR 工作流。",
+							"/help audit — PR 正确性、需求和安全三门审计。",
 							"/help loop — Engineering Loop。",
 							"/help safety — 项目中立的安全规则。",
 							"/help roadmap — 规划能力。",
@@ -288,7 +321,7 @@ export default function kitHelp(pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("help", {
-		description: "Pi Kit 帮助中心；用法：/help [installed|skills|linear|loop|safety|roadmap]",
+		description: "Pi Kit 帮助中心；用法：/help [installed|skills|linear|audit|loop|safety|roadmap]",
 		getArgumentCompletions(prefix) {
 			const items = HELP_TOPICS.filter((topic) => topic.startsWith(prefix.trim().toLowerCase())).map((topic) => ({ value: topic, label: topic }));
 			return items.length ? items : null;
