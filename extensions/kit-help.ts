@@ -1,7 +1,7 @@
 import type { ExtensionAPI, SlashCommandInfo } from "@earendil-works/pi-coding-agent";
 import { Box, Text } from "@earendil-works/pi-tui";
 
-const HELP_TOPICS = ["overview", "installed", "skills", "linear", "audit", "loop", "roadmap", "safety"] as const;
+const HELP_TOPICS = ["overview", "installed", "skills", "development", "linear", "audit", "loop", "roadmap", "safety"] as const;
 type HelpTopic = (typeof HELP_TOPICS)[number];
 
 type HelpSection = { title: string; lines: string[] };
@@ -33,11 +33,6 @@ const ROADMAP: Array<{ name: string; command: string; purpose: string }> = [
 		name: "智能验证",
 		command: "/verify [changed|package|repo]（规划中）",
 		purpose: "根据项目配置和 Git diff 选择测试、构建、lint 与代码生成检查。",
-	},
-	{
-		name: "PR/CI 助手",
-		command: "/pr、/pr-check、/ci（规划中）",
-		purpose: "检查 PR base/head、CI、review comments、Issue 链接和验证说明。",
 	},
 ];
 
@@ -115,6 +110,49 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 					{ title: `当前已加载（${skills.length}）`, lines: skills.length ? skills.map(commandLine) : ["暂无。"] },
 				],
 				paths: skills.map((skill) => skill.sourceInfo.path),
+				createdAt: Date.now(),
+			};
+		case "development":
+			return {
+				topic,
+				title: "通用开发审计与排障 Skills",
+				sections: [
+					{
+						title: "CI、Review 与影响面",
+						lines: [
+							"/skill:ci-triage <run|job|PR> — 定位首个有效 CI 失败与根因。",
+							"/skill:review-resolver <PR|comments> — 验证审查意见并形成解决计划。",
+							"/skill:change-impact <range|PR|提案> — 追踪直接与传递影响。",
+							"/skill:test-gap <range|功能> — 建立行为—测试矩阵并排序补测。",
+						],
+					},
+					{
+						title: "契约、数据与依赖",
+						lines: [
+							"/skill:schema-migration-audit <range|PR> — 审计迁移兼容、锁、数据与恢复。",
+							"/skill:api-contract-audit <range|PR> — 审计 API/事件/CLI/库契约兼容。",
+							"/skill:dependency-upgrade <package|range> — 审计升级、lock 与供应链风险。",
+						],
+					},
+					{
+						title: "发布与事件",
+						lines: [
+							"/skill:release-readiness <candidate> — 汇总发布门禁并给出 GO/NO-GO/BLOCKED。",
+							"/skill:incident-triage <incident evidence> — 只读建立影响、时间线与假设。",
+						],
+					},
+					{
+						title: "统一安全边界",
+						lines: [
+							"九项能力默认只读：不 push、不修改 PR/Linear、不部署、不触碰主工作区。",
+							"只有 review-resolver 可在用户明确要求修复、展示计划并获确认后修改隔离任务代码。",
+							"上述确认仍不授权 push、发布 review 回复、resolve thread 或其他外部写操作。",
+						],
+					},
+				],
+				paths: skills
+					.filter((skill) => ["ci-triage", "review-resolver", "change-impact", "test-gap", "schema-migration-audit", "api-contract-audit", "release-readiness", "dependency-upgrade", "incident-triage"].includes(skill.name.replace(/^skill:/, "")))
+					.map((skill) => skill.sourceInfo.path),
 				createdAt: Date.now(),
 			};
 		case "linear":
@@ -247,8 +285,9 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 					{
 						title: "外部动作",
 						lines: [
-							"自动 push/PR 只在相应 Skill 的理解卡和计划确认后生效。",
-							"合并、审批、Issue 回写、发布和部署需要单独授权。",
+							"九个通用开发审计/排障 Skill 默认不 push、不改 PR/Linear、不部署、不触碰主工作区。",
+							"review-resolver 仅在明确修改授权、计划展示并确认、隔离任务工作区三项都满足后修改任务代码。",
+							"linear-to-pr 的既有确认闸门可授权任务分支 push/PR；合并、审批、Issue 回写、发布和部署仍需单独授权。",
 						],
 					},
 				],
@@ -265,6 +304,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 						lines: [
 							"/help installed — 当前命令、Skill 和扩展工具。",
 							"/help skills — Skill 安装和调用。",
+							"/help development — 九个通用开发审计与排障 Skill。",
 							"/help linear — 通用 Linear 到 PR 工作流。",
 							"/help audit — PR 正确性、需求和安全三门审计。",
 							"/help loop — Engineering Loop。",
@@ -321,7 +361,7 @@ export default function kitHelp(pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("help", {
-		description: "Pi Kit 帮助中心；用法：/help [installed|skills|linear|audit|loop|safety|roadmap]",
+		description: "Pi Kit 帮助中心；用法：/help [installed|skills|development|linear|audit|loop|safety|roadmap]",
 		getArgumentCompletions(prefix) {
 			const items = HELP_TOPICS.filter((topic) => topic.startsWith(prefix.trim().toLowerCase())).map((topic) => ({ value: topic, label: topic }));
 			return items.length ? items : null;

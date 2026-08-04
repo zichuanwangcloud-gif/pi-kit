@@ -11,6 +11,16 @@ Pi Kit 可以通过 Git、Git bundle 或其他可信分发方式迁移。迁移�
 - `feature-trace`
 - `linear-to-pr`
 - `pr-audit`
+- 九个通用开发审计/排障 Skill：
+  - `ci-triage`
+  - `review-resolver`
+  - `change-impact`
+  - `test-gap`
+  - `schema-migration-audit`
+  - `api-contract-audit`
+  - `release-readiness`
+  - `dependency-upgrade`
+  - `incident-triage`
 - `/loop`、`/loop-status`、`/loop-pause`、`/loop-resume`、`/loop-cancel`
 - `docs/` 中的使用与维护说明
 
@@ -63,6 +73,7 @@ Pi 内：
 /reload
 /help installed
 /help skills
+/help development
 /help safety
 ```
 
@@ -75,6 +86,10 @@ Pi 内：
 3. 受保护分支和分支命名规则。
 4. 测试、构建、lint、代码生成和安全扫描命令。
 5. Linear 团队 key 与 GitHub CLI 认证范围。
+6. 新增审计 Skill 所需的平台只读权限、日志保留与敏感数据处理规则。
+7. migration/API/release/incident 工作流各自的 owner、runbook 与人工签核点。
+
+九个通用开发 Skill 不把缺失工具当成功：依赖、网络或权限不足时记录 `BLOCKED`/未验证，继续能够完成的静态检查。它们默认不 push、不改 PR/Linear、不部署，也不触碰主工作区。`review-resolver` 是唯一修改例外，但只有用户明确要求修复、已看到并确认计划、且当前位于隔离任务工作区后才能修改任务代码；仍不得自动发布回复、resolve thread 或执行其他外部写操作。
 
 不要把某台机器上的绝对 worktree 路径复制成团队标准。
 
@@ -103,5 +118,7 @@ Bundle 只包含已提交 Git 对象，不包含凭据、Pi Session 或未提交
 pi list
 cd ~/git/pi-kit
 npm run check
+git diff --check
+bash -n scripts/*.sh
 ./scripts/doctor.sh
 ```

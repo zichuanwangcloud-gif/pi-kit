@@ -21,6 +21,15 @@
 | 功能溯源 | `/skill:feature-trace <描述>` | 在 Web、服务端或 monorepo 中追踪真实代码路径、UI 入口、文案和测试点 |
 | Linear → PR | `/skill:linear-to-pr TEAM-123` | 完整审阅 Linear 需求，确认后在隔离 worktree 实现、验证并创建 PR |
 | PR 三门审计 | `/skill:pr-audit 123 [--linear on]` | 审计正确性、可选需求完整性和代码安全；启用 Gate 全部 PASS 后给出评级 |
+| CI 排障 | `/skill:ci-triage <run|job|PR>` | 还原失败时间线，定位首个有效错误并区分代码、flaky、配置和基础设施问题 |
+| Review 解决 | `/skill:review-resolver <PR|comments>` | 验证、去重和规划审查意见；确认计划后才可在隔离任务工作区修改代码 |
+| 影响面分析 | `/skill:change-impact <range|PR|提案>` | 追踪依赖、运行时、数据、契约、交付和用户影响 |
+| 测试缺口 | `/skill:test-gap <range|功能>` | 建立行为—测试矩阵，评价断言质量并排序补测 |
+| Schema 迁移审计 | `/skill:schema-migration-audit <range|PR>` | 审计兼容窗口、锁、数据校验、执行顺序和恢复 |
+| API 契约审计 | `/skill:api-contract-audit <range|PR>` | 审计 HTTP/RPC/事件/CLI/库契约兼容和消费者风险 |
+| 发布就绪 | `/skill:release-readiness <candidate>` | 汇总质量、安全、运维、rollout 和 rollback 门禁 |
+| 依赖升级 | `/skill:dependency-upgrade <package|range>` | 核对版本、lockfile、上游 breaking、安全、许可证和验证计划 |
+| Incident 初排 | `/skill:incident-triage <evidence>` | 安全地建立事件范围、时间线、假设、缓解建议和交接材料 |
 | Engineering Loop | `/loop` | 在当前非受保护分支中进行有完成条件的安全迭代 |
 
 ## 快速安装
@@ -115,6 +124,28 @@ Skill 会先探测项目结构，再按真实路由/import/调用关系追踪，
 
 默认关闭 Linear 对比，仅审计 Correctness 和 Security，二者都通过即 `2/2 PASS`。开启后增加 Requirements Gate，必须 `3/3 PASS`。报告同时给出 Gate 状态、S/A/B/C/D/F 等级和合并建议；第一版只在 Pi 输出，不自动评论或修改 PR。
 
+### 通用开发审计与排障
+
+九个新增 Skill 覆盖从 CI 到发布/事件的只读工作流：
+
+```text
+/skill:ci-triage <run-or-job>
+/skill:review-resolver <pr-or-comments>
+/skill:change-impact <commit-range>
+/skill:test-gap <commit-range-or-feature>
+/skill:schema-migration-audit <commit-range>
+/skill:api-contract-audit <commit-range>
+/skill:release-readiness <candidate-sha-or-tag>
+/skill:dependency-upgrade <package-or-commit-range>
+/skill:incident-triage <incident-evidence>
+```
+
+它们先读取目标仓库说明、manifest、CI 和相关配置，再选择证据与命令；示例参数不是固定平台或项目约定。缺少 CLI、依赖、网络或权限时会标记 `BLOCKED`/未验证并继续可行的静态审计，不会编造结果或自动安装未知工具。
+
+统一安全边界：默认不 push、不修改 PR/Linear、不部署、不触碰主工作区。只有 `review-resolver` 能修改任务代码，而且必须先收到明确修复授权、展示逐条计划、再由用户确认，并且当前目录必须是安全隔离的任务分支/worktree；它仍不会自动 push、发布回复或 resolve thread。
+
+用 `/help development` 查看分类入口，用 `/help installed` 核对当前实际加载路径。
+
 ### Engineering Loop
 
 先进入任务分支或 worktree，再启动 Pi：
@@ -168,10 +199,12 @@ pi -e ./extensions/engineering-loop/index.ts
 4. 通用流程放在 Skill；项目专属命令和路径放在目标项目自己的说明中。
 5. 示例使用占位符或中性名称，不把单个项目约定描述为普遍规则。
 
-详见 [贡献与通用化指南](docs/CONTRIBUTING.md)、[迁移清单](docs/MIGRATION.md)、[PR Audit 设计](docs/experience/pr-audit.md) 和 [经验文档](docs/experience/)。
+详见 [贡献与通用化指南](docs/CONTRIBUTING.md)、[迁移清单](docs/MIGRATION.md)、[通用开发 Skills 设计](docs/experience/development-skills.md)、[PR Audit 设计](docs/experience/pr-audit.md) 和 [经验文档](docs/experience/)。
 
 ## 安全边界
 
+- 新增的审计/排障 Skill 默认只读：不 push、不修改 PR/Linear、不部署、不触碰主工作区。
+- `review-resolver` 只有在明确修复授权、计划展示并确认、隔离任务工作区都满足时才可改任务代码；该确认不授权外部写操作。
 - 不直接修改或推送已确认的受保护分支。
 - 不 force push，不擅自 reset/clean/stash 用户改动。
 - 在需求、基线、真实代码落点或验证结果不清时停止并询问。
