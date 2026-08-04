@@ -1,6 +1,6 @@
 {
   "name": "pi-kit",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "Portable, project-agnostic Pi extensions, agent skills, and engineering workflows.",
@@ -9,6 +9,11 @@
     "agent-skills",
     "engineering-workflows",
     "pull-request-audit",
+    "ci-triage",
+    "code-review",
+    "change-impact",
+    "release-readiness",
+    "incident-response",
     "linear"
   ],
   "license": "UNLICENSED",

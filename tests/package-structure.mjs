@@ -1,9 +1,20 @@
 import { access, readFile } from "node:fs/promises";
 import { constants } from "node:fs";
-import { resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const developmentSkills = [
+	"ci-triage",
+	"review-resolver",
+	"change-impact",
+	"test-gap",
+	"schema-migration-audit",
+	"api-contract-audit",
+	"release-readiness",
+	"dependency-upgrade",
+	"incident-triage",
+];
 const required = [
 	"package.json",
 	"README.md",
@@ -17,17 +28,70 @@ const required = [
 	"skills/linear-to-pr/SKILL.md",
 	"skills/linear-to-pr/scripts/fetch-linear-issue.mjs",
 	"skills/pr-audit/SKILL.md",
+	...developmentSkills.map((name) => `skills/${name}/SKILL.md`),
 	"docs/CONTRIBUTING.md",
 	"docs/MIGRATION.md",
 	"docs/experience/pr-audit.md",
+	"docs/experience/development-skills.md",
 ];
 
 for (const path of required) await access(resolve(root, path), constants.R_OK);
+
 const manifest = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
 if (!manifest.keywords?.includes("pi-package")) throw new Error("package.json is missing pi-package keyword");
+if (!manifest.keywords?.includes("ci-triage") || !manifest.keywords?.includes("incident-response")) {
+	throw new Error("package.json metadata does not advertise the development workflows");
+}
 if (!manifest.pi?.extensions?.length || !manifest.pi?.skills?.length) throw new Error("Pi resource manifest is incomplete");
+if (!manifest.pi.skills.includes("./skills")) throw new Error("Pi manifest must discover the project-neutral skills directory");
 if (manifest.pi.extensions.some((path) => /cloudrouter/i.test(path))) {
 	throw new Error("Pi extension manifest contains a project-specific name");
+}
+
+function frontmatter(content, path) {
+	const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+	if (!match) throw new Error(`${path} is missing Agent Skills frontmatter`);
+	const values = new Map();
+	for (const line of match[1].split(/\r?\n/)) {
+		const field = line.match(/^([a-z][a-z0-9-]*):\s*(.*)$/);
+		if (field) values.set(field[1], field[2].trim());
+	}
+	return values;
+}
+
+for (const name of developmentSkills) {
+	const path = `skills/${name}/SKILL.md`;
+	const content = await readFile(resolve(root, path), "utf8");
+	const fields = frontmatter(content, path);
+	const skillName = fields.get("name");
+	const description = fields.get("description") ?? "";
+	if (skillName !== name || basename(dirname(path)) !== skillName) {
+		throw new Error(`${path} frontmatter name must match its directory`);
+	}
+	if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(skillName) || skillName.length > 64) {
+		throw new Error(`${path} has an invalid Agent Skills name`);
+	}
+	if (!description || description.length > 1024) throw new Error(`${path} has an invalid description`);
+	if (!fields.get("compatibility") || !fields.get("allowed-tools")) {
+		throw new Error(`${path} must document compatibility and allowed tools`);
+	}
+	const requiredPolicies = [
+		[/不[^。\n]{0,20}push/i, "no push"],
+		[/不[^。\n]{0,40}(?:修改|改)[^。\n]{0,20}PR/i, "no PR mutation"],
+		[/不[^。\n]{0,20}部署/i, "no deploy"],
+		[/主工作区/, "do not touch the primary workspace"],
+	];
+	for (const [pattern, label] of requiredPolicies) {
+		if (!pattern.test(content)) throw new Error(`${path} is missing safety policy: ${label}`);
+	}
+	if (name !== "review-resolver" && /allowed-tools:.*\b(?:edit|write)\b/.test(content)) {
+		throw new Error(`${path} must remain read-only`);
+	}
+}
+
+const reviewResolver = await readFile(resolve(root, "skills/review-resolver/SKILL.md"), "utf8");
+for (const rule of ["默认模式是**只读分析**", "用户确认计划", "隔离任务分支/worktree", "不授权 push"]) {
+	if (!reviewResolver.includes(rule)) throw new Error(`review-resolver is missing edit gate: ${rule}`);
 }
 
 const linearSkill = await readFile(resolve(root, "skills/linear-to-pr/SKILL.md"), "utf8");
@@ -53,21 +117,25 @@ for (const rule of requiredAuditRules) {
 	if (!prAuditSkill.includes(rule)) throw new Error(`pr-audit is missing policy: ${rule}`);
 }
 
+const discoverabilityFiles = ["README.md", "docs/MIGRATION.md", "docs/experience/development-skills.md", "extensions/kit-help.ts"];
+for (const path of discoverabilityFiles) {
+	const content = await readFile(resolve(root, path), "utf8");
+	for (const name of developmentSkills) {
+		if (!content.includes(name)) throw new Error(`${path} does not advertise ${name}`);
+	}
+}
+const help = await readFile(resolve(root, "extensions/kit-help.ts"), "utf8");
+if (!help.includes('case "development"') || !help.includes("/help development")) {
+	throw new Error("/help is missing the development skills topic");
+}
+
 const portableFiles = [
-	"README.md",
-	"package.json",
-	"extensions/kit-help.ts",
-	"extensions/engineering-loop/index.ts",
-	"skills/feature-trace/SKILL.md",
-	"skills/linear-to-pr/SKILL.md",
-	"skills/linear-to-pr/scripts/fetch-linear-issue.mjs",
-	"skills/pr-audit/SKILL.md",
-	"docs/CONTRIBUTING.md",
-	"docs/MIGRATION.md",
-	"docs/experience/engineering-loop.md",
-	"docs/experience/linear-to-pr.md",
-	"docs/experience/pi-extension-notes.md",
-	"docs/experience/pr-audit.md",
+	...new Set([
+		...required.filter((path) => /^(README|package\.json|extensions|skills|docs)/.test(path)),
+		"docs/experience/engineering-loop.md",
+		"docs/experience/linear-to-pr.md",
+		"docs/experience/pi-extension-notes.md",
+	]),
 ];
 const forbiddenProjectBindings = [
 	[/CloudRouter/i, "legacy repository name"],
@@ -82,4 +150,6 @@ for (const path of portableFiles) {
 	}
 }
 
-console.log(`Package structure OK (${required.length} required files; portability, auto-PR, and PR-audit policies verified)`);
+console.log(
+	`Package structure OK (${required.length} required files; ${developmentSkills.length} development skills, portability, safety, auto-PR, and PR-audit policies verified)`,
+);
