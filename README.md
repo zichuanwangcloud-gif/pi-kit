@@ -20,7 +20,7 @@
 | Skill 调度 | `/skills`、`invoke_skill` | 交互或由模型按任务加载已发现的 Skill |
 | 功能溯源 | `/skill:feature-trace <描述>` | 在 Web、服务端或 monorepo 中追踪真实代码路径、UI 入口、文案和测试点 |
 | Linear → PR | `/skill:linear-to-pr TEAM-123` | 完整审阅 Linear 需求，确认后在隔离 worktree 实现、验证并创建 PR |
-| PR 三门审计 | `/skill:pr-audit 123 [--linear on]` | 审计正确性、可选需求完整性和代码安全；启用 Gate 全部 PASS 后给出评级 |
+| PR 三门审计 | `/skill:pr-audit 123 [--linear on]` | 审计正确性、可选需求完整性和代码安全；启用 Gate 全部 PASS 即建议通过 |
 | CI 排障 | `/skill:ci-triage <run|job|PR>` | 还原失败时间线，定位首个有效错误并区分代码、flaky、配置和基础设施问题 |
 | Review 解决 | `/skill:review-resolver <PR|comments>` | 验证、去重和规划审查意见；确认计划后才可在隔离任务工作区修改代码 |
 | 影响面分析 | `/skill:change-impact <range|PR|提案>` | 追踪依赖、运行时、数据、契约、交付和用户影响 |
@@ -122,7 +122,9 @@ Skill 会先探测项目结构，再按真实路由/import/调用关系追踪，
 /skill:pr-audit 123 --linear on
 ```
 
-默认关闭 Linear 对比，仅审计 Correctness 和 Security，二者都通过即 `2/2 PASS`。开启后增加 Requirements Gate，必须 `3/3 PASS`。报告同时给出 Gate 状态、S/A/B/C/D/F 等级和合并建议；第一版只在 Pi 输出，不自动评论或修改 PR。
+默认关闭 Linear 对比，仅审计 Correctness 和 Security，二者都通过即 `2/2 PASS`。开启后增加 Requirements Gate，必须 `3/3 PASS`。报告输出 Gate 状态、阻断问题列表和合并建议；第一版只在 Pi 输出，不自动评论或修改 PR。
+
+小改动（diff < 50 行且不涉及 schema、依赖、权限、CI 或认证）走快速档：代码审阅 + 目标测试 + secret 扫描，跳过隔离 worktree 和 SAST，输出精简结论。
 
 ### 通用开发审计与排障
 

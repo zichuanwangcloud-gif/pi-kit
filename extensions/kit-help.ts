@@ -215,10 +215,11 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 						],
 					},
 					{
-						title: "通过与评级",
+						title: "通过与建议",
 						lines: [
 							"Linear 开启要求 3/3 PASS；关闭时 Requirements=DISABLED，其余要求 2/2 PASS。",
-							"同时输出 PASS/FAIL/BLOCKED 门禁和 S/A/B/C/D/F 等级；只有 PASS + S/A 建议通过。",
+							"输出 PASS/FAIL/BLOCKED 门禁和阻断问题；PASS 且无未缓解 Medium 才建议通过。",
+							"diff < 50 行且不涉及 schema/依赖/权限/CI/认证时走快速档，跳过 worktree 和 SAST。",
 						],
 					},
 				],

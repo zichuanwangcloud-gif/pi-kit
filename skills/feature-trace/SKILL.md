@@ -1,6 +1,6 @@
 ---
 name: feature-trace
-description: 从功能描述、Issue、changelog、commit 或 PR 线索追踪当前仓库中的真实代码实现、用户入口、可见文案、依赖调用链，并生成带证据的 QA checklist。用于“功能入口在哪”“实现在哪里”“这个功能怎么测”“提测说明”“功能定位”等请求。
+description: 从功能描述、Issue、changelog、commit 或 PR 线索追踪当前仓库中的真实代码实现、用户入口、可见文案、依赖调用链，并生成带证据的 QA checklist。用于“功能入口在哪”“实现在哪里”“这个功能怎么测”“提测说明”“功能定位”等请求。仅用于定位现有功能的实现位置和测试点；要评估改动的影响半径请用 `change-impact`，要审计已开 PR 请用 `pr-audit`。
 compatibility: Requires a readable project checkout and a code search tool such as ripgrep. Supports monorepos and common frontend/backend stacks without requiring a specific framework.
 allowed-tools: read bash
 metadata:
@@ -37,7 +37,7 @@ metadata:
 ```bash
 git rev-parse --show-toplevel
 git status --short --branch
-find .. -name AGENTS.md -o -name CLAUDE.md
+find . -maxdepth 3 \( -name AGENTS.md -o -name CLAUDE.md \) -not -path './.git/*'
 ```
 
 只读取当前仓库及相关目标模块的说明。记录：

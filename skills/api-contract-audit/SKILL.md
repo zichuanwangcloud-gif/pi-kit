@@ -1,6 +1,6 @@
 ---
 name: api-contract-audit
-description: 审计 HTTP、RPC、事件、CLI 或库 API 变更的消费者兼容性、schema、错误语义、版本策略与契约测试，识别 breaking change 和 rollout 风险。用于“API 是否破坏兼容”“接口变更审查”“OpenAPI/事件契约审计”“SDK 兼容性”等请求。
+description: 审计 HTTP、RPC、事件、CLI 或库 API 变更的消费者兼容性、schema、错误语义、版本策略与契约测试，识别 breaking change 和 rollout 风险。用于“API 是否破坏兼容”“接口变更审查”“OpenAPI/事件契约审计”“SDK 兼容性”等请求。本 Skill 只做跨边界契约兼容性审计；泛化的改动影响面用 `change-impact`，数据层 schema 与迁移用 `schema-migration-audit`。
 compatibility: Requires a readable git checkout. Contract formats, generators, compatibility checkers, and test commands are discovered from repository documentation and configuration.
 allowed-tools: read bash
 metadata:
@@ -59,7 +59,7 @@ metadata:
 
 ## 5. 只读验证
 
-从仓库发现已有 schema lint、breaking-change checker、codegen check、contract/integration tests。先读脚本，不自动安装/下载工具，不调用部署或远程写 API。生成检查可能改文件时在隔离 worktree运行并用 diff 验证；依赖缺失标 `BLOCKED`。
+从仓库发现已有 schema lint、breaking-change checker、codegen check、contract/integration tests。先读脚本，不自动安装/下载工具，不调用部署或远程写 API。生成检查可能改文件时在隔离 worktree 运行并用 diff 验证；依赖缺失标 `BLOCKED`。
 
 checker 通过不替代人工语义审计；工具未配置时不虚构命令。
 

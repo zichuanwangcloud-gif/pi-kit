@@ -1,6 +1,6 @@
 ---
 name: release-readiness
-description: 在发布前汇总范围、CI/测试、缺陷、契约、迁移、依赖、安全、运维、回滚和审批证据，给出 GO、NO-GO 或 BLOCKED 的只读发布就绪结论。用于“能不能发版”“release checklist”“上线前审计”“发布风险盘点”等请求。
+description: 在发布前汇总范围、CI/测试、缺陷、契约、迁移、依赖、安全、运维、回滚和审批证据，给出 GO、NO-GO 或 BLOCKED 的只读发布就绪结论。用于“能不能发版”“release checklist”“上线前审计”“发布风险盘点”等请求。本 Skill 面向发布候选的多维门禁汇总；单个 PR 的合并门禁用 `pr-audit`。
 compatibility: Requires a readable git checkout. Release metadata and CI status may require authenticated read-only platform CLIs; release conventions are discovered from repository documentation and configuration.
 allowed-tools: read bash invoke_skill
 metadata:

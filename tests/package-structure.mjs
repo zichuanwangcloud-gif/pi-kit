@@ -111,10 +111,50 @@ const requiredAuditRules = [
 	"二者都 `PASS`，即 **2 PASS**",
 	"第一版始终只输出到 Pi",
 	"不自动安装未知工具",
-	"S/A/B/C/D/F",
 ];
 for (const rule of requiredAuditRules) {
 	if (!prAuditSkill.includes(rule)) throw new Error(`pr-audit is missing policy: ${rule}`);
+}
+if (/S\/A\/B\/C\/D\/F/.test(prAuditSkill)) {
+	throw new Error("pr-audit must not reintroduce the letter grade scale; gates and blocking findings are the verdict");
+}
+
+// Progressive disclosure: the two largest skills keep a self-sufficient trunk and
+// move long-form command listings and templates into references/.
+const progressiveSkills = [
+	{ name: "pr-audit", maxLines: 150 },
+	{ name: "linear-to-pr", maxLines: 180 },
+];
+for (const { name, maxLines } of progressiveSkills) {
+	const trunk = await readFile(resolve(root, `skills/${name}/SKILL.md`), "utf8");
+	// Match wc -l: a trailing newline terminates the last line, it does not start a new one.
+	const lines = trunk.replace(/\r?\n$/, "").split(/\r?\n/).length;
+	if (lines > maxLines) {
+		throw new Error(`skills/${name}/SKILL.md is ${lines} lines; keep the trunk under ${maxLines} and move detail into references/`);
+	}
+	if (!/references\//.test(trunk)) {
+		throw new Error(`skills/${name}/SKILL.md must point at its references/ files`);
+	}
+	for (const match of trunk.matchAll(/references\/([a-z0-9-]+\.md)/g)) {
+		await access(resolve(root, `skills/${name}/references/${match[1]}`), constants.R_OK);
+	}
+}
+
+// Portability and shell-compatibility regressions caught in review.
+for (const path of [...developmentSkills, "feature-trace", "linear-to-pr", "pr-audit"]) {
+	const files = [`skills/${path}/SKILL.md`];
+	for (const file of files) {
+		const content = await readFile(resolve(root, file), "utf8");
+		if (/find\s+\.\.\s/.test(content)) {
+			throw new Error(`${file} scans the parent directory; scope discovery to the current repository`);
+		}
+		if (/\$\{[A-Za-z_][A-Za-z0-9_]*,,\}/.test(content)) {
+			throw new Error(`${file} uses bash 4+ case conversion; use tr for portability`);
+		}
+		if (/loop-blocked/.test(content)) {
+			throw new Error(`${file} emits <loop-blocked>, which only the engineering-loop extension parses; ask the user directly`);
+		}
+	}
 }
 
 const discoverabilityFiles = ["README.md", "docs/MIGRATION.md", "docs/experience/development-skills.md", "extensions/kit-help.ts"];

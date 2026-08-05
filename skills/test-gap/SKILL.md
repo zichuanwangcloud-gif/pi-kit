@@ -1,6 +1,6 @@
 ---
 name: test-gap
-description: 审计实现、diff 或需求的测试覆盖缺口，将行为与现有测试逐项映射，评估测试是否能捕获回归，并输出按风险排序的补测计划。用于“缺哪些测试”“测试覆盖够不够”“回归测试审计”“test plan review”等请求。
+description: 审计实现、diff 或需求的测试覆盖缺口，将行为与现有测试逐项映射，评估测试是否能捕获回归，并输出按风险排序的补测计划。用于“缺哪些测试”“测试覆盖够不够”“回归测试审计”“test plan review”等请求。本 Skill 只做测试覆盖缺口审计；要评估改动的整体影响面用 `change-impact`。
 compatibility: Requires a readable git checkout. Test frameworks, coverage tooling, and validation commands are discovered from repository documentation and configuration; coverage data is optional.
 allowed-tools: read bash
 metadata:
@@ -20,7 +20,7 @@ metadata:
 
 读取根与目标模块的 `AGENTS.md`、`CLAUDE.md`、`CONTRIBUTING*`、测试/CI 文档。发现实际 manifest、test config、CI steps、coverage thresholds、fixture/factory、integration environment、snapshot/property/fuzz/contract/e2e 约定。不要假定语言、框架、`tests/` 目录或 `npm test`。
 
-记录现有验证命令的**来源**。先读脚本再运行；禁止部署、发布、外部写入、生产凭据或未知 installer。测试会生成文件/数据库/依赖时使用隔离 worktree或项目规定的沙箱。
+记录现有验证命令的**来源**。先读脚本再运行；禁止部署、发布、外部写入、生产凭据或未知 installer。测试会生成文件/数据库/依赖时使用隔离 worktree 或项目规定的沙箱。
 
 ## 2. 建立行为清单
 
@@ -73,7 +73,7 @@ metadata:
 # Test Gap 报告
 ## 结论
 - 范围/head：...
-- 总体：充分 / 有缺口 / BLOCKED（附理由）
+- 总体：PASS / FAIL / BLOCKED（附理由）
 
 ## 行为—测试矩阵
 | ID | 行为与来源 | 现有测试 | 断言质量 | 状态 |
