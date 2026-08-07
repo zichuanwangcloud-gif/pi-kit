@@ -81,9 +81,12 @@ Pi Kit 不再内置某个项目的分支和目录约定。使用前应确认：
 
 ```text
 /skill:linear-to-pr ENG-123 --base develop
+/skill:linear-to-pr ENG-123 --no-status
 ```
 
 若不传 `--base`，Skill 会从仓库文档、远程默认分支和当前工作流中探测；证据冲突时先询问。裸数字只有在 `LINEAR_TEAM_KEY` 已配置时才会补全。
+
+状态回写默认开启：确认计划后把 Issue 置为团队 `type=started` 的状态（多个候选时取看板最靠左的一列）。`--no-status` 关闭；`--state-name "<状态名>"` 覆盖自动匹配。已在进行中或更靠后列的 Issue 不会被回退，已完成/已取消的不会被重开。
 
 可选环境变量：
 
@@ -113,7 +116,7 @@ Skill 会先探测项目结构，再按真实路由/import/调用关系追踪，
 
 工作流为：完整需求审阅 → 理解卡与计划 → 用户确认 → 从远程基线创建 worktree → 实现与验证 → 提交并推送任务分支 → 创建到确认基线的 PR。
 
-确认理解卡和计划即授权最后的任务分支 push 与 PR 创建；force push、合并/approve/ready PR、回写 Linear、部署仍不在授权范围内。
+确认理解卡和计划即授权最后的任务分支 push、PR 创建，以及把 Issue 一次性置为团队的「进行中」状态（`--no-status` 可关闭）；force push、合并/approve/ready PR、回写 Linear 评论、修改其他 Issue 字段、部署仍不在授权范围内。
 
 ### PR 三门审计
 

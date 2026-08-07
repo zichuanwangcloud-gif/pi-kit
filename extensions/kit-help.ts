@@ -186,7 +186,8 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 						title: "授权与安全",
 						lines: [
 							"理解卡和计划确认后，验证成功即自动提交、普通 push 任务分支并创建到已确认 base 的 PR。",
-							"不 force push，不直推保护分支，不自动 merge/approve/ready、回写 Issue 或部署。",
+							"不 force push，不直推保护分支，不自动 merge/approve/ready、回写 Issue 评论或部署。",
+							"确认后自动把 Issue 置为团队的进行中状态；--no-status 可关闭。",
 						],
 					},
 				],
