@@ -34,7 +34,7 @@
     "typebox": "*"
   },
   "scripts": {
-    "check": "node --check skills/linear-to-pr/scripts/fetch-linear-issue.mjs && node tests/package-structure.mjs",
+    "check": "find skills -name '*.mjs' -print0 | xargs -0 -n1 node --check && node tests/package-structure.mjs",
     "test:skill": "node tests/package-structure.mjs"
   }
 }

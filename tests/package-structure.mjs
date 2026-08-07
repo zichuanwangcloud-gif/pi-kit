@@ -27,6 +27,7 @@ const required = [
 	"skills/feature-trace/SKILL.md",
 	"skills/linear-to-pr/SKILL.md",
 	"skills/linear-to-pr/scripts/fetch-linear-issue.mjs",
+	"skills/linear-to-pr/scripts/update-issue-state.mjs",
 	"skills/pr-audit/SKILL.md",
 	...developmentSkills.map((name) => `skills/${name}/SKILL.md`),
 	"docs/CONTRIBUTING.md",
@@ -103,6 +104,28 @@ const requiredAutoPrRules = [
 ];
 for (const rule of requiredAutoPrRules) {
 	if (!linearSkill.includes(rule)) throw new Error(`linear-to-pr is missing auto-PR rule: ${rule}`);
+}
+
+// Status writeback: these three invariants regress silently if someone
+// "simplifies" the matching rule, drops the opt-out, or widens the grant.
+const requiredStatusRules = [
+	"type=started",
+	"--no-status",
+	"回写 Linear 评论",
+];
+for (const rule of requiredStatusRules) {
+	if (!linearSkill.includes(rule)) throw new Error(`linear-to-pr is missing status rule: ${rule}`);
+}
+
+// The read-only fetch path must stay mutation-free: pr-audit promises it never
+// runs a Linear mutation, and that promise is only verifiable at file level.
+const fetchScript = await readFile(resolve(root, "skills/linear-to-pr/scripts/fetch-linear-issue.mjs"), "utf8");
+if (/\bmutation\b|issueUpdate/.test(fetchScript)) {
+	throw new Error("fetch-linear-issue.mjs must stay read-only; put mutations in update-issue-state.mjs");
+}
+const stateScript = await readFile(resolve(root, "skills/linear-to-pr/scripts/update-issue-state.mjs"), "utf8");
+if (!/issueUpdate/.test(stateScript) || !/"started"/.test(stateScript)) {
+	throw new Error("update-issue-state.mjs must set the issue to its team's started state via issueUpdate");
 }
 
 const prAuditSkill = await readFile(resolve(root, "skills/pr-audit/SKILL.md"), "utf8");
