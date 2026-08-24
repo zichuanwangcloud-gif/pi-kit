@@ -11,6 +11,7 @@ Pi Kit 可以通过 Git、Git bundle 或其他可信分发方式迁移。迁移�
 - `feature-trace`
 - `linear-to-pr`
 - `pr-audit`
+- `linear-pr-audit`
 - 九个通用开发审计/排障 Skill：
   - `ci-triage`
   - `review-resolver`
@@ -86,10 +87,13 @@ Pi 内：
 3. 受保护分支和分支命名规则。
 4. 测试、构建、lint、代码生成和安全扫描命令。
 5. Linear 团队 key 与 GitHub CLI 认证范围。
-6. 新增审计 Skill 所需的平台只读权限、日志保留与敏感数据处理规则。
-7. migration/API/release/incident 工作流各自的 owner、runbook 与人工签核点。
+6. `linear-pr-audit` 所需的额外写权限：对 PR head 分支的 push 权限，以及带评论写入范围的 Linear API key。缺任一项时它会降级为只读 patch 输出。
+7. 新增审计 Skill 所需的平台只读权限、日志保留与敏感数据处理规则。
+8. migration/API/release/incident 工作流各自的 owner、runbook 与人工签核点。
 
 九个通用开发 Skill 不把缺失工具当成功：依赖、网络或权限不足时记录 `BLOCKED`/未验证，继续能够完成的静态检查。它们默认不 push、不改 PR/Linear、不部署，也不触碰主工作区。`review-resolver` 是唯一修改例外，但只有用户明确要求修复、已看到并确认计划、且当前位于隔离任务工作区后才能修改任务代码；仍不得自动发布回复、resolve thread 或执行其他外部写操作。
+
+`linear-pr-audit` 不属于这九个只读 Skill：它在用户确认验收计划后可以修改实现、推送修复到 PR head 分支并回写 Linear 评论。迁移到新项目前应先确认该项目允许审计流程推送代码，以及 Linear API key 的评论写入范围。
 
 不要把某台机器上的绝对 worktree 路径复制成团队标准。
 
