@@ -28,6 +28,8 @@ const required = [
 	"skills/linear-to-pr/SKILL.md",
 	"skills/linear-to-pr/scripts/fetch-linear-issue.mjs",
 	"skills/pr-audit/SKILL.md",
+	"skills/linear-pr-audit/SKILL.md",
+	"skills/linear-pr-audit/scripts/post-linear-comment.mjs",
 	...developmentSkills.map((name) => `skills/${name}/SKILL.md`),
 	"docs/CONTRIBUTING.md",
 	"docs/MIGRATION.md",
@@ -115,6 +117,39 @@ const requiredAuditRules = [
 ];
 for (const rule of requiredAuditRules) {
 	if (!prAuditSkill.includes(rule)) throw new Error(`pr-audit is missing policy: ${rule}`);
+}
+if (/^allowed-tools:.*\b(?:edit|write)\b/m.test(prAuditSkill)) {
+	throw new Error("pr-audit must stay read-only; acceptance writeback belongs to linear-pr-audit");
+}
+
+const linearPrAuditPath = "skills/linear-pr-audit/SKILL.md";
+const linearPrAuditSkill = await readFile(resolve(root, linearPrAuditPath), "utf8");
+const linearPrAuditFields = frontmatter(linearPrAuditSkill, linearPrAuditPath);
+if (linearPrAuditFields.get("name") !== "linear-pr-audit") {
+	throw new Error(`${linearPrAuditPath} frontmatter name must match its directory`);
+}
+for (const field of ["description", "compatibility", "allowed-tools"]) {
+	if (!linearPrAuditFields.get(field)) throw new Error(`${linearPrAuditPath} is missing ${field}`);
+}
+const requiredLinearPrAuditRules = [
+	// Four-gate accounting: Acceptance is never optional and never averaged away.
+	"四门都必须 `PASS`，即 **4/4 PASS**",
+	// Self-certification guards: the auditor may fix code, but may not move the goalposts.
+	"禁止修改或删除既有测试",
+	"临时验收测试不提交",
+	"本次审计推送的修复 commit",
+	// Write-boundary guards.
+	"禁止 force push",
+	"无法 push 时降级为只读 patch 输出",
+	"不部署",
+	"不触碰主工作区",
+	// Report gating and idempotency.
+	"验收未全部 PASS 前不发送自测报告",
+	"post-linear-comment.mjs",
+	"pi-kit:linear-pr-audit:",
+];
+for (const rule of requiredLinearPrAuditRules) {
+	if (!linearPrAuditSkill.includes(rule)) throw new Error(`linear-pr-audit is missing policy: ${rule}`);
 }
 
 const discoverabilityFiles = ["README.md", "docs/MIGRATION.md", "docs/experience/development-skills.md", "extensions/kit-help.ts"];

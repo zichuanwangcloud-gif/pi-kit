@@ -21,6 +21,7 @@
 | 功能溯源 | `/skill:feature-trace <描述>` | 在 Web、服务端或 monorepo 中追踪真实代码路径、UI 入口、文案和测试点 |
 | Linear → PR | `/skill:linear-to-pr TEAM-123` | 完整审阅 Linear 需求，确认后在隔离 worktree 实现、验证并创建 PR |
 | PR 三门审计 | `/skill:pr-audit 123 [--linear on]` | 审计正确性、可选需求完整性和代码安全；启用 Gate 全部 PASS 后给出评级 |
+| Linear 验收审计 | `/skill:linear-pr-audit 123 TEAM-456` | 在三门之上叠加验收门：逐条可执行验证 Linear 验收标准，确认后可修复并复验，4/4 PASS 后回写自测报告 |
 | CI 排障 | `/skill:ci-triage <run|job|PR>` | 还原失败时间线，定位首个有效错误并区分代码、flaky、配置和基础设施问题 |
 | Review 解决 | `/skill:review-resolver <PR|comments>` | 验证、去重和规划审查意见；确认计划后才可在隔离任务工作区修改代码 |
 | 影响面分析 | `/skill:change-impact <range|PR|提案>` | 追踪依赖、运行时、数据、契约、交付和用户影响 |
@@ -124,6 +125,18 @@ Skill 会先探测项目结构，再按真实路由/import/调用关系追踪，
 
 默认关闭 Linear 对比，仅审计 Correctness 和 Security，二者都通过即 `2/2 PASS`。开启后增加 Requirements Gate，必须 `3/3 PASS`。报告同时给出 Gate 状态、S/A/B/C/D/F 等级和合并建议；第一版只在 Pi 输出，不自动评论或修改 PR。
 
+### Linear 验收审计
+
+```text
+/skill:linear-pr-audit 123 TEAM-456
+/skill:linear-pr-audit 123 TEAM-456 --max-rounds 2
+/skill:linear-pr-audit 123 TEAM-456 --no-post
+```
+
+在三门之上叠加 Acceptance 验收门，必须 `4/4 PASS`。它把 Linear 的验收标准逐条拆开，用自动化测试或可复现命令**实际验证**，而不是静态比对；未通过时重点说明缺什么、缺在哪、期望与实际，等用户确认后可在隔离 worktree 修复实现、推送修复并复验，循环直到全过，最后按固定模板把自测报告发送到 Linear Issue 评论区。
+
+它是本包中唯一会推送代码并回写 Linear 的 Skill，因此有一个明确的授权闸门：用户确认验收计划后才创建 worktree。临时验收测试只在 worktree 内运行、登记到 `.git/info/exclude`，不进入 PR；报告会列出本次审计推送的全部修复 commit，便于人类 reviewer 分辨哪些改动出自审计者。fork PR 或对 head 分支无 push 权限时降级为只读 patch 输出，不发送「全过」报告。
+
 ### 通用开发审计与排障
 
 九个新增 Skill 覆盖从 CI 到发布/事件的只读工作流：
@@ -204,6 +217,7 @@ pi -e ./extensions/engineering-loop/index.ts
 ## 安全边界
 
 - 新增的审计/排障 Skill 默认只读：不 push、不修改 PR/Linear、不部署、不触碰主工作区。
+- `linear-pr-audit` 是唯一会推送代码并回写 Linear 的 Skill：必须先展示验收计划并由用户确认一次，之后才可在隔离 worktree 修实现、展示 diff 后推送修复到 PR head 分支、并在 4/4 PASS 后发送自测报告；它仍不 force push、不改 PR 状态、不改 Linear 字段、不提交临时验收测试、不修改既有测试。
 - `review-resolver` 只有在明确修复授权、计划展示并确认、隔离任务工作区都满足时才可改任务代码；该确认不授权外部写操作。
 - 不直接修改或推送已确认的受保护分支。
 - 不 force push，不擅自 reset/clean/stash 用户改动。

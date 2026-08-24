@@ -196,14 +196,15 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 		case "audit":
 			return {
 				topic,
-				title: "PR 三门审计",
+				title: "PR 审计：三门与验收闭环",
 				sections: [
 					{
 						title: "入口",
 						lines: [
 							"/skill:pr-audit 123",
 							"/skill:pr-audit 123 --linear on",
-							"默认 --linear off；只在 Pi 输出，不发布 PR comment/review。",
+							"/skill:linear-pr-audit 123 TEAM-456",
+							"pr-audit 默认 --linear off；只在 Pi 输出，不发布 PR comment/review。",
 						],
 					},
 					{
@@ -212,17 +213,29 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 							"Correctness：代码审阅、单测、lint、typecheck、编译和 CI 证据。",
 							"Requirements：可选读取 Linear 全部需求，建立需求→实现→测试矩阵。",
 							"Security：人工威胁审阅以及项目已有 secret/SAST/依赖扫描。",
+							"Acceptance（仅 linear-pr-audit）：逐条验收标准用测试或可复现命令实际跑通。",
 						],
 					},
 					{
 						title: "通过与评级",
 						lines: [
 							"Linear 开启要求 3/3 PASS；关闭时 Requirements=DISABLED，其余要求 2/2 PASS。",
+							"linear-pr-audit 恒定四门，要求 4/4 PASS 才回写自测报告。",
 							"同时输出 PASS/FAIL/BLOCKED 门禁和 S/A/B/C/D/F 等级；只有 PASS + S/A 建议通过。",
 						],
 					},
+					{
+						title: "写操作边界",
+						lines: [
+							"pr-audit 全程只读。",
+							"linear-pr-audit 需用户确认验收计划一次，之后可修实现、推送修复、发送 Linear 评论；",
+							"仍不 force push、不改 PR 状态、不提交临时验收测试、不修改既有测试。",
+						],
+					},
 				],
-				paths: skills.filter((skill) => skill.name === "skill:pr-audit").map((skill) => skill.sourceInfo.path),
+				paths: skills
+					.filter((skill) => ["skill:pr-audit", "skill:linear-pr-audit"].includes(skill.name))
+					.map((skill) => skill.sourceInfo.path),
 				createdAt: Date.now(),
 			};
 		case "loop":
@@ -288,6 +301,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 							"九个通用开发审计/排障 Skill 默认不 push、不改 PR/Linear、不部署、不触碰主工作区。",
 							"review-resolver 仅在明确修改授权、计划展示并确认、隔离任务工作区三项都满足后修改任务代码。",
 							"linear-to-pr 的既有确认闸门可授权任务分支 push/PR；合并、审批、Issue 回写、发布和部署仍需单独授权。",
+							"linear-pr-audit 的验收计划确认可授权修实现、推送修复到 PR head 分支和发送 Linear 自测报告；force push、改 PR 状态、提交临时验收测试和修改既有测试始终禁止。",
 						],
 					},
 				],
