@@ -17,6 +17,7 @@
 | 能力 | 入口 | 适用场景 |
 |---|---|---|
 | 帮助中心 | `/help` | 动态查看已安装命令、Skill、通用安全规则和配置提示；不调用模型 |
+| 用量仪表 | 状态栏、`/usage` | 页脚实时显示上下文占用与会话成本；命令输出按模型分组的 token 用量卡片 |
 | Skill 调度 | `/skills`、`invoke_skill` | 交互或由模型按任务加载已发现的 Skill |
 | 功能溯源 | `/skill:feature-trace <描述>` | 在 Web、服务端或 monorepo 中追踪真实代码路径、UI 入口、文案和测试点 |
 | Linear → PR | `/skill:linear-to-pr TEAM-123` | 完整审阅 Linear 需求，确认后在隔离 worktree 实现、验证并创建 PR |
