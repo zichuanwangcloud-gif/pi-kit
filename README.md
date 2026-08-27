@@ -20,9 +20,9 @@
 | 用量仪表 | 状态栏、`/usage` | 页脚实时显示上下文占用与会话成本；命令输出按模型分组的 token 用量卡片 |
 | Skill 调度 | `/skills`、`invoke_skill` | 交互或由模型按任务加载已发现的 Skill |
 | 功能溯源 | `/skill:feature-trace <描述>` | 在 Web、服务端或 monorepo 中追踪真实代码路径、UI 入口、文案和测试点 |
-| Linear → PR | `/skill:linear-to-pr TEAM-123` | 完整审阅 Linear 需求，确认后在隔离 worktree 实现、验证并创建 PR |
-| PR 三门审计 | `/skill:pr-audit 123 [--linear on]` | 审计正确性、可选需求完整性和代码安全；启用 Gate 全部 PASS 后给出评级 |
-| Linear 验收审计 | `/skill:linear-pr-audit 123 TEAM-456` | 在三门之上叠加验收门：逐条可执行验证 Linear 验收标准，确认后可修复并复验，4/4 PASS 后回写自测报告 |
+| Linear → PR | `/skill:linear-to-pr TEAM-123 [--dry-run\|--no-pr]` | 先过 Issue 形态/状态闸门，分层读完全部评论与文档并输出理解卡；确认后在隔离 worktree 实现、逐包验证、推送任务分支并创建 PR，支持断点恢复 |
+| PR 三门审计 | `/skill:pr-audit 123 [--linear on]` | 只读审计正确性、可选的需求静态可追溯性和代码安全；启用 Gate 全部 PASS 后给出评级 |
+| Linear 验收审计 | `/skill:linear-pr-audit 123 TEAM-456` | 在三门之上叠加验收门：逐条验收标准用带失败基线的可复现命令实际跑通，确认后可修实现、推送修复、等待 CI 落定并复验，4/4 PASS 后回写自测报告 |
 | CI 排障 | `/skill:ci-triage <run|job|PR>` | 还原失败时间线，定位首个有效错误并区分代码、flaky、配置和基础设施问题 |
 | Review 解决 | `/skill:review-resolver <PR|comments>` | 验证、去重和规划审查意见；确认计划后才可在隔离任务工作区修改代码 |
 | 影响面分析 | `/skill:change-impact <range|PR|提案>` | 追踪依赖、运行时、数据、契约、交付和用户影响 |
@@ -83,7 +83,16 @@ Pi Kit 不再内置某个项目的分支和目录约定。使用前应确认：
 
 ```text
 /skill:linear-to-pr ENG-123 --base develop
+/skill:linear-to-pr ENG-123 --dry-run
+/skill:linear-to-pr ENG-123 --no-pr --worktree-root ~/worktrees
 ```
+
+| 参数 | 作用 |
+|---|---|
+| `--base <branch>` | 显式指定 PR base |
+| `--dry-run` | 只产出审阅卡、理解卡和实施计划，不创建 worktree、不改代码 |
+| `--no-pr` | 做到提交并 push 任务分支为止，PR 标题与 body 只输出文本 |
+| `--worktree-root <path>` | 指定 worktree 存放根目录 |
 
 若不传 `--base`，Skill 会从仓库文档、远程默认分支和当前工作流中探测；证据冲突时先询问。裸数字只有在 `LINEAR_TEAM_KEY` 已配置时才会补全。
 
@@ -111,11 +120,18 @@ Skill 会先探测项目结构，再按真实路由/import/调用关系追踪，
 
 ```text
 /skill:linear-to-pr ENG-123 --base develop
+/skill:linear-to-pr ENG-123 --dry-run
 ```
 
-工作流为：完整需求审阅 → 理解卡与计划 → 用户确认 → 从远程基线创建 worktree → 实现与验证 → 提交并推送任务分支 → 创建到确认基线的 PR。
+工作流为：预检 → 读取 Issue → **形态/状态闸门** → 分层审阅全部评论与文档 → 定位真实代码落点 → 理解卡与计划 → 用户确认 → **断点检测** → 从远程基线创建 worktree → 环境引导 → 实现与逐包验证 → 提交并推送任务分支 → 创建到确认基线的 PR。
 
-确认理解卡和计划即授权最后的任务分支 push 与 PR 创建；force push、合并/approve/ready PR、回写 Linear、部署仍不在授权范围内。
+三个容易被忽略的环节：
+
+- **形态/状态闸门先于需求内容**：Issue 已取消/已完成、是 duplicate、是含子 issue 的 parent，或被未完成的前置 issue 阻塞时先停下询问，不按正文开工。
+- **评论分层阅读**：带需求信号的、含链接的、最早与最新若干条以及全部人类评论逐字读，机器人评论按类汇总登记；上下文不足以读完时停止报告，不静默降级为摘要。
+- **断点检测**：重跑同一个 Issue 时先探测 worktree/分支/远程分支/PR 残留。判定为本次任务残留时自动恢复，归属不明时停止，不自行删除。
+
+确认理解卡和计划即授权最后的任务分支 push 与 PR 创建；force push、合并/approve/ready PR、回写 Linear、部署仍不在授权范围内。`--dry-run` 到计划为止，`--no-pr` 到 push 为止。
 
 ### PR 三门审计
 
@@ -126,17 +142,21 @@ Skill 会先探测项目结构，再按真实路由/import/调用关系追踪，
 
 默认关闭 Linear 对比，仅审计 Correctness 和 Security，二者都通过即 `2/2 PASS`。开启后增加 Requirements Gate，必须 `3/3 PASS`。报告同时给出 Gate 状态、S/A/B/C/D/F 等级和合并建议；第一版只在 Pi 输出，不自动评论或修改 PR。
 
+Requirements Gate 只判定**静态可追溯性**——每条原子需求有没有可指认的实现代码和对应测试。它不执行验收场景，因此不会给出「验收通过/未通过」的结论；需要可执行的验收结论时用下面的 `linear-pr-audit`。
+
 ### Linear 验收审计
 
 ```text
 /skill:linear-pr-audit 123 TEAM-456
-/skill:linear-pr-audit 123 TEAM-456 --max-rounds 2
+/skill:linear-pr-audit 123 TEAM-456 --max-rounds 2 --ci-timeout 60
 /skill:linear-pr-audit 123 TEAM-456 --no-post
 ```
 
-在三门之上叠加 Acceptance 验收门，必须 `4/4 PASS`。它把 Linear 的验收标准逐条拆开，用自动化测试或可复现命令**实际验证**，而不是静态比对；未通过时重点说明缺什么、缺在哪、期望与实际，等用户确认后可在隔离 worktree 修复实现、推送修复并复验，循环直到全过，最后按固定模板把自测报告发送到 Linear Issue 评论区。
+在三门之上叠加 Acceptance 验收门，必须 `4/4 PASS`。它把 Linear 的验收标准逐条拆开，用自动化测试或可复现命令**实际验证**，而不是静态比对：每条自动化测试 AC 都要先证明它在修复前会失败，绿灯加已证明的红色基线才算证据。未通过时重点说明缺什么、缺在哪、期望与实际，等用户确认后可在隔离 worktree 修复实现、推送修复、**等待 CI 落定**并复验，循环直到全过，最后按固定模板把自测报告发送到 Linear Issue 评论区。
 
-它是本包中唯一会推送代码并回写 Linear 的 Skill，因此有一个明确的授权闸门：用户确认验收计划后才创建 worktree。临时验收测试只在 worktree 内运行、登记到 `.git/info/exclude`，不进入 PR；报告会列出本次审计推送的全部修复 commit，便于人类 reviewer 分辨哪些改动出自审计者。fork PR 或对 head 分支无 push 权限时降级为只读 patch 输出，不发送「全过」报告。
+分母恒为拆出的 AC 总条数，不得改写；本质不可验证的条目只能靠签核人自己在 Linear 留评论形成 waiver，对话中的口头同意不算，且带 waiver 时评级上限为 A。
+
+它是本包中唯一会推送代码并回写 Linear 的 Skill，因此有一个明确的授权闸门：用户确认验收计划后才创建 worktree。临时验收测试只在 worktree 内运行，不进入 PR；每轮推送后立即在 PR 上发披露评论，报告也会列出本次审计推送的全部修复 commit，便于人类 reviewer 分辨哪些改动出自审计者。fork PR 或对 head 分支无 push 权限时降级为只读 patch 输出，不发送「全过」报告。
 
 ### 通用开发审计与排障
 
@@ -198,6 +218,32 @@ docs/                   用户指南、设计说明和维护文档
 tests/                  轻量结构与策略检查
 ```
 
+### 渐进加载：`skills/<name>/references/`
+
+Pi 启动时只发现 `SKILL.md` 的 frontmatter，任务匹配后才加载正文。流程复杂的 Skill 如果把全部执行细节写进 `SKILL.md`，正文会长到无法复核；写短又会丢掉真正踩过的坑。因此约定：
+
+```text
+skills/<name>/SKILL.md              流程骨架、状态模型、闸门位置、停止条件
+skills/<name>/references/<topic>.md 长篇、低频的执行口径，由对应步骤显式引用
+skills/<name>/scripts/              该 Skill 调用的辅助脚本
+```
+
+规则：
+
+1. `SKILL.md` 保留「什么时候必须停下来问」；`references/` 只承载「怎么做」。
+2. 引用写成相对路径 `references/<topic>.md`，以 `SKILL.md` 所在目录为基准，并在引用它的那一步就近给出。
+3. `SKILL.md` 里出现的每个指针都必须真实存在。
+4. `references/` 下的每个文件都必须被 `SKILL.md` 引用——未被引用的参考文件永远不会被加载。
+5. 参考文件本身要足够充实，否则应直接并回 `SKILL.md`。
+6. 参考文件与 `SKILL.md` 受同一套可移植性约束：不写死绝对路径、仓库名、团队 key 或公司命名空间。
+
+`tests/package-structure.mjs` 双向校验第 3–5 条，并对参考文件执行同样的可移植性检查。当前 `linear-to-pr` 与 `linear-pr-audit` 使用该约定：
+
+| Skill | references/ |
+|---|---|
+| `linear-to-pr` | `worktree-setup.md`、`verification.md`、`pr-output.md`、`recovery.md` |
+| `linear-pr-audit` | `write-safety.md`、`ac-taxonomy.md`、`anti-tautology.md`、`rerun-scope.md`、`report-templates.md` |
+
 ## 开发与审查
 
 ```bash
@@ -209,16 +255,16 @@ pi -e ./extensions/engineering-loop/index.ts
 
 1. frontmatter 的 `name` 使用小写字母、数字和连字符。
 2. `description` 同时写清“做什么”和“何时使用”。
-3. 相对资源路径以 `SKILL.md` 所在目录为基准。
+3. 相对资源路径以 `SKILL.md` 所在目录为基准；长篇执行细节放进 `references/` 并在对应步骤引用。
 4. 通用流程放在 Skill；项目专属命令和路径放在目标项目自己的说明中。
 5. 示例使用占位符或中性名称，不把单个项目约定描述为普遍规则。
 
-详见 [贡献与通用化指南](docs/CONTRIBUTING.md)、[迁移清单](docs/MIGRATION.md)、[通用开发 Skills 设计](docs/experience/development-skills.md)、[PR Audit 设计](docs/experience/pr-audit.md) 和 [经验文档](docs/experience/)。
+详见 [贡献与通用化指南](docs/CONTRIBUTING.md)、[迁移清单](docs/MIGRATION.md)、[通用开发 Skills 设计](docs/experience/development-skills.md)、[PR Audit 设计](docs/experience/pr-audit.md)、[Linear 验收审计设计](docs/experience/linear-pr-audit.md)、[Linear → PR 使用经验](docs/experience/linear-to-pr.md) 和 [经验文档](docs/experience/)。
 
 ## 安全边界
 
 - 新增的审计/排障 Skill 默认只读：不 push、不修改 PR/Linear、不部署、不触碰主工作区。
-- `linear-pr-audit` 是唯一会推送代码并回写 Linear 的 Skill：必须先展示验收计划并由用户确认一次，之后才可在隔离 worktree 修实现、展示 diff 后推送修复到 PR head 分支、并在 4/4 PASS 后发送自测报告；它仍不 force push、不改 PR 状态、不改 Linear 字段、不提交临时验收测试、不修改既有测试。
+- `linear-pr-audit` 是唯一会推送代码并回写 Linear 的 Skill：必须先展示验收计划并由用户确认一次，之后才可在隔离 worktree 修实现、展示 diff 后推送修复到 PR head 分支、每轮推送后在 PR 上发披露评论、等待 CI 落定后复验，并在 4/4 PASS 后发送自测报告；它仍不 force push、不改 PR 状态、不改 Linear 字段、不提交临时验收测试、不修改既有测试。
 - `review-resolver` 只有在明确修复授权、计划展示并确认、隔离任务工作区都满足时才可改任务代码；该确认不授权外部写操作。
 - 不直接修改或推送已确认的受保护分支。
 - 不 force push，不擅自 reset/clean/stash 用户改动。

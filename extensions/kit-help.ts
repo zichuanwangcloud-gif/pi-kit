@@ -165,6 +165,9 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 						lines: [
 							"/skill:linear-to-pr ENG-123 --base develop",
 							"/skills linear-to-pr ENG-123 --base develop",
+							"/skill:linear-to-pr ENG-123 --dry-run — 只出审阅卡、理解卡和计划，不建 worktree、不改代码。",
+							"/skill:linear-to-pr ENG-123 --no-pr — 做到提交并 push 任务分支为止，PR 文本只输出不创建。",
+							"/skill:linear-to-pr ENG-123 --worktree-root <path> — 指定 worktree 存放根目录。",
 							"完整 identifier 最可靠；裸数字需要 LINEAR_TEAM_KEY。",
 						],
 					},
@@ -179,7 +182,17 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 						title: "需求硬闸门",
 						lines: [
 							"按时间顺序阅读正文、全部评论、附件和决定实现的需求文档。",
+							"先过形态/状态闸门：已取消/已完成、duplicate、含子 issue 的 parent、被前置阻塞时停止询问。",
+							"评论量大时分层读：需求信号/链接/最早最新/人类评论逐字读，bot 评论按类汇总登记。",
 							"评论未读完、关键文档不可访问或冲突未解决时禁止开工。",
+						],
+					},
+					{
+						title: "执行与恢复",
+						lines: [
+							"每次 bash 调用都是新 shell：计划确认后把参数固化成常量文件，之后每段先 source 再断言非空。",
+							"git 命令一律带 -C，推送只用显式 refspec，不依赖上一次调用里赋的变量。",
+							"重跑同一 Issue 先做断点检测：判定为本次残留即自动恢复；归属不明则停止，不自行删除。",
 						],
 					},
 					{
@@ -204,6 +217,9 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 							"/skill:pr-audit 123",
 							"/skill:pr-audit 123 --linear on",
 							"/skill:linear-pr-audit 123 TEAM-456",
+							"/skill:linear-pr-audit 123 TEAM-456 --max-rounds 2 — 限制修复复验轮次（默认 3）。",
+							"/skill:linear-pr-audit 123 TEAM-456 --ci-timeout 60 — 每轮等 CI 落定的分钟数（默认 45）。",
+							"/skill:linear-pr-audit 123 TEAM-456 --no-post — 全部验证照做，但不发送 Linear 评论。",
 							"pr-audit 默认 --linear off；只在 Pi 输出，不发布 PR comment/review。",
 						],
 					},
@@ -212,8 +228,10 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 						lines: [
 							"Correctness：代码审阅、单测、lint、typecheck、编译和 CI 证据。",
 							"Requirements：可选读取 Linear 全部需求，建立需求→实现→测试矩阵。",
+							"Requirements 只判静态存在性（有没有实现和测试），不判验收跑不跑得通。",
 							"Security：人工威胁审阅以及项目已有 secret/SAST/依赖扫描。",
 							"Acceptance（仅 linear-pr-audit）：逐条验收标准用测试或可复现命令实际跑通。",
+							"Acceptance 的 PASS 需要两个退出码：先证明测试在修复前会红，再证明修复后变绿。",
 						],
 					},
 					{
@@ -221,6 +239,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 						lines: [
 							"Linear 开启要求 3/3 PASS；关闭时 Requirements=DISABLED，其余要求 2/2 PASS。",
 							"linear-pr-audit 恒定四门，要求 4/4 PASS 才回写自测报告。",
+							"分母恒为拆出的 AC 总条数，不得改写；waiver 需签核人自己在 Linear 留评论，评级上限降为 A。",
 							"同时输出 PASS/FAIL/BLOCKED 门禁和 S/A/B/C/D/F 等级；只有 PASS + S/A 建议通过。",
 						],
 					},
@@ -229,6 +248,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 						lines: [
 							"pr-audit 全程只读。",
 							"linear-pr-audit 需用户确认验收计划一次，之后可修实现、推送修复、发送 Linear 评论；",
+							"每轮推送后立即在 PR 上发披露评论，并等 CI 落定后才重算 Correctness；",
 							"仍不 force push、不改 PR 状态、不提交临时验收测试、不修改既有测试。",
 						],
 					},

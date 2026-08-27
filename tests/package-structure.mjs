@@ -1,9 +1,14 @@
-import { access, readFile } from "node:fs/promises";
+import { access, readdir, readFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
+
+// Policy assertions match prose that authors re-wrap freely. Compare with whitespace
+// collapsed so a line break inside a required phrase is not a false failure.
+const flat = (text) => text.replace(/\s+/gu, " ");
+const carries = (content, rule) => flat(content).includes(flat(rule));
 const developmentSkills = [
 	"ci-triage",
 	"review-resolver",
@@ -34,6 +39,7 @@ const required = [
 	"docs/CONTRIBUTING.md",
 	"docs/MIGRATION.md",
 	"docs/experience/pr-audit.md",
+	"docs/experience/linear-pr-audit.md",
 	"docs/experience/development-skills.md",
 ];
 
@@ -93,7 +99,7 @@ for (const name of developmentSkills) {
 
 const reviewResolver = await readFile(resolve(root, "skills/review-resolver/SKILL.md"), "utf8");
 for (const rule of ["默认模式是**只读分析**", "用户确认计划", "隔离任务分支/worktree", "不授权 push"]) {
-	if (!reviewResolver.includes(rule)) throw new Error(`review-resolver is missing edit gate: ${rule}`);
+	if (!carries(reviewResolver, rule)) throw new Error(`review-resolver is missing edit gate: ${rule}`);
 }
 
 const linearSkill = await readFile(resolve(root, "skills/linear-to-pr/SKILL.md"), "utf8");
@@ -104,7 +110,7 @@ const requiredAutoPrRules = [
 	"不要自动 merge、approve 或 ready",
 ];
 for (const rule of requiredAutoPrRules) {
-	if (!linearSkill.includes(rule)) throw new Error(`linear-to-pr is missing auto-PR rule: ${rule}`);
+	if (!carries(linearSkill, rule)) throw new Error(`linear-to-pr is missing auto-PR rule: ${rule}`);
 }
 
 const prAuditSkill = await readFile(resolve(root, "skills/pr-audit/SKILL.md"), "utf8");
@@ -116,7 +122,7 @@ const requiredAuditRules = [
 	"S/A/B/C/D/F",
 ];
 for (const rule of requiredAuditRules) {
-	if (!prAuditSkill.includes(rule)) throw new Error(`pr-audit is missing policy: ${rule}`);
+	if (!carries(prAuditSkill, rule)) throw new Error(`pr-audit is missing policy: ${rule}`);
 }
 if (/^allowed-tools:.*\b(?:edit|write)\b/m.test(prAuditSkill)) {
 	throw new Error("pr-audit must stay read-only; acceptance writeback belongs to linear-pr-audit");
@@ -149,7 +155,7 @@ const requiredLinearPrAuditRules = [
 	"pi-kit:linear-pr-audit:",
 ];
 for (const rule of requiredLinearPrAuditRules) {
-	if (!linearPrAuditSkill.includes(rule)) throw new Error(`linear-pr-audit is missing policy: ${rule}`);
+	if (!carries(linearPrAuditSkill, rule)) throw new Error(`linear-pr-audit is missing policy: ${rule}`);
 }
 
 const discoverabilityFiles = ["README.md", "docs/MIGRATION.md", "docs/experience/development-skills.md", "extensions/kit-help.ts"];
@@ -164,9 +170,64 @@ if (!help.includes('case "development"') || !help.includes("/help development"))
 	throw new Error("/help is missing the development skills topic");
 }
 
+// Progressive disclosure: a SKILL.md may delegate detail to `references/*.md`. Every such
+// pointer must resolve, every reference file must be substantive, and all of them are held to
+// the same portability rules as the skills themselves.
+const skillsDir = resolve(root, "skills");
+const skillNames = (await readdir(skillsDir, { withFileTypes: true }))
+	.filter((entry) => entry.isDirectory())
+	.map((entry) => entry.name)
+	.sort();
+
+const referenceFiles = [];
+for (const name of skillNames) {
+	const skillPath = `skills/${name}/SKILL.md`;
+	const content = await readFile(resolve(root, skillPath), "utf8");
+
+	let present = [];
+	try {
+		present = (await readdir(resolve(skillsDir, name, "references")))
+			.filter((file) => file.endsWith(".md"))
+			.sort();
+	} catch (error) {
+		if (error.code !== "ENOENT") throw error;
+	}
+
+	// Pointers written as `references/foo.md` or bare `foo.md` inside a references sentence.
+	const cited = new Set(
+		[...content.matchAll(/references\/([a-z0-9-]+\.md)/gu)].map((match) => match[1]),
+	);
+	for (const file of cited) {
+		if (!present.includes(file)) {
+			throw new Error(`${skillPath} cites references/${file}, which does not exist`);
+		}
+	}
+
+	// Official Agent Skills budget: keep the SKILL.md body under 500 lines and move detail into
+	// references/. Three independent sources converge on this number, so enforce it rather than
+	// rediscovering the drift later.
+	const bodyLines = content.split(/\r?\n/).length;
+	if (bodyLines > 500) {
+		throw new Error(`${skillPath} is ${bodyLines} lines; keep the body under 500 and move detail into references/`);
+	}
+
+	for (const file of present) {
+		const path = `skills/${name}/references/${file}`;
+		const body = await readFile(resolve(root, path), "utf8");
+		if (body.split(/\r?\n/).length < 20) {
+			throw new Error(`${path} is too thin to justify a separate reference file`);
+		}
+		if (!cited.has(file)) {
+			throw new Error(`${path} is never referenced from ${skillPath}; it would never be loaded`);
+		}
+		referenceFiles.push(path);
+	}
+}
+
 const portableFiles = [
 	...new Set([
 		...required.filter((path) => /^(README|package\.json|extensions|skills|docs)/.test(path)),
+		...referenceFiles,
 		"docs/experience/engineering-loop.md",
 		"docs/experience/linear-to-pr.md",
 		"docs/experience/pi-extension-notes.md",
@@ -177,6 +238,7 @@ const forbiddenProjectBindings = [
 	[/clouditera/i, "legacy project namespace"],
 	[/\/opt\/CloudRouter/i, "legacy absolute repository path"],
 	[/团队 key 固定为\s*`?CR`?/i, "fixed Linear team key"],
+	[/\/(?:opt|home|Users)\/[a-z0-9._-]+\//i, "absolute machine-specific path"],
 ];
 for (const path of portableFiles) {
 	const content = await readFile(resolve(root, path), "utf8");
@@ -186,5 +248,5 @@ for (const path of portableFiles) {
 }
 
 console.log(
-	`Package structure OK (${required.length} required files; ${developmentSkills.length} development skills, portability, safety, auto-PR, and PR-audit policies verified)`,
+	`Package structure OK (${required.length} required files; ${developmentSkills.length} development skills, ${referenceFiles.length} reference files, portability, safety, auto-PR, and PR-audit policies verified)`,
 );
