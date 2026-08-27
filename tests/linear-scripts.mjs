@@ -21,6 +21,7 @@ delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
 const lib = await import(`file://${LIB_A}`);
 const fetchScript = await import(`file://${resolve(root, "skills/linear-to-pr/scripts/fetch-linear-issue.mjs")}`);
 const postScript = await import(`file://${resolve(root, "skills/linear-pr-audit/scripts/post-linear-comment.mjs")}`);
+const stateScript = await import(`file://${resolve(root, "skills/linear-to-pr/scripts/update-issue-state.mjs")}`);
 
 const {
 	EXIT,
@@ -136,6 +137,7 @@ await test("D1 lib-linear.mjs is byte-identical across both skill script dirs", 
 await test("D1 each skill's scripts import only within its own directory", () => {
 	for (const file of [
 		"skills/linear-to-pr/scripts/fetch-linear-issue.mjs",
+		"skills/linear-to-pr/scripts/update-issue-state.mjs",
 		"skills/linear-pr-audit/scripts/post-linear-comment.mjs",
 		"skills/linear-to-pr/scripts/lib-linear.mjs",
 	]) {
@@ -656,6 +658,7 @@ await test("D8 the exit-code table matches the declared contract", () => {
 	// Each script re-exports its own copy's table; the values must agree exactly.
 	assert.deepEqual(fetchScript.EXIT, EXIT, "fetch-linear-issue.mjs must export the same table");
 	assert.deepEqual(postScript.EXIT, EXIT, "post-linear-comment.mjs must export the same table");
+	assert.deepEqual(stateScript.EXIT, EXIT, "update-issue-state.mjs must export the same table");
 
 	for (const [name, value] of Object.entries(EXIT)) {
 		assert.equal(new LinearError(name, "x").exitCode, value, `LinearError(${name}).exitCode`);
@@ -683,6 +686,326 @@ await test("D8 fail writes the JSON envelope to stderr and sets the exit code", 
 
 	const parsed = JSON.parse(chunks.join(""));
 	assert.deepEqual(parsed, { ok: false, code: "AUTH", message: "no key configured" });
+});
+
+/* ------------------------------ D9: update-issue-state (the only write) */
+
+const STATE_BACKLOG = { id: "s-backlog", name: "Backlog", type: "backlog", position: 0 };
+const STATE_TODO = { id: "s-todo", name: "Todo", type: "unstarted", position: 1 };
+const STATE_PROGRESS = { id: "s-progress", name: "In Progress", type: "started", position: 2 };
+const STATE_REVIEW = { id: "s-review", name: "In Review", type: "started", position: 3 };
+const STATE_MERGE = { id: "s-merge", name: "Ready to Merge", type: "started", position: 4 };
+const STATE_DONE = { id: "s-done", name: "Done", type: "completed", position: 5 };
+const STATE_CANCELED = { id: "s-canceled", name: "Canceled", type: "canceled", position: 6 };
+
+const ENG_7 = parseIdentifier("ENG-7");
+
+const issueBody = (state) => ({
+	data: {
+		issues: {
+			nodes: [
+				{
+					id: "issue-7",
+					identifier: "ENG-7",
+					url: "https://linear.app/acme/issue/ENG-7",
+					state,
+					team: { id: "t1", key: "ENG", name: "Engineering" },
+				},
+			],
+		},
+	},
+});
+
+const statesBody = (nodes, pageInfo = { hasNextPage: false, endCursor: null }) => ({
+	data: { workflowStates: { nodes, pageInfo } },
+});
+
+const updateBody = (state, success = true) => ({
+	data: {
+		issueUpdate: {
+			success,
+			issue: { id: "issue-7", identifier: "ENG-7", url: "https://linear.app/acme/issue/ENG-7", state },
+		},
+	},
+});
+
+// Deliberately unsorted, and with the started band interleaved, so a passing test really does
+// prove the position rule rather than "the first started node in the array".
+const ALL_STATES = [STATE_REVIEW, STATE_DONE, STATE_MERGE, STATE_BACKLOG, STATE_PROGRESS, STATE_TODO, STATE_CANCELED];
+
+await test("D9 selectTargetState picks the lowest-position type=started candidate", () => {
+	const chosen = stateScript.selectTargetState(ALL_STATES, "");
+	assert.equal(chosen.target.id, STATE_PROGRESS.id, "the lowest-position started column must win");
+	assert.equal(chosen.rule, "lowest-position");
+	assert.deepEqual(
+		chosen.candidates.map((state) => state.id),
+		[STATE_PROGRESS.id, STATE_REVIEW.id, STATE_MERGE.id],
+		"candidates must be the started band only, sorted by position",
+	);
+
+	// Position ties fall back to a stable id comparison, never to array order.
+	const tied = stateScript.selectTargetState(
+		[
+			{ id: "b", name: "B", type: "started", position: 2 },
+			{ id: "a", name: "A", type: "started", position: 2 },
+		],
+		"",
+	);
+	assert.equal(tied.target.id, "a", "a position tie must break deterministically by id");
+
+	const single = stateScript.selectTargetState([STATE_TODO, STATE_PROGRESS], "");
+	assert.equal(single.rule, "only-candidate");
+	assert.equal(single.target.id, STATE_PROGRESS.id);
+});
+
+await test("D9 selectTargetState never invents a state when the team has no started band", () => {
+	const none = stateScript.selectTargetState([STATE_BACKLOG, STATE_TODO, STATE_DONE, STATE_CANCELED], "");
+	assert.equal(none.target, null, "no started candidate must not fall back to backlog/unstarted/completed");
+	assert.equal(none.rule, "no-started-state");
+	assert.deepEqual(none.candidates, []);
+	assert.deepEqual(stateScript.selectTargetState([], "").candidates, []);
+});
+
+await test("D9 selectTargetState honours --state-name only inside the started band", () => {
+	const named = stateScript.selectTargetState(ALL_STATES, "  in review  ");
+	assert.equal(named.target.id, STATE_REVIEW.id, "an explicit name must beat the position rule");
+	assert.equal(named.rule, "explicit-name");
+
+	// A real state of the wrong type is NOT a valid override: exiting 2 is better than
+	// completing or cancelling an issue because someone mistyped a column name.
+	for (const name of ["Done", "Backlog", "Todo", "Canceled", "In Progres", ""]) {
+		const miss = stateScript.selectTargetState(ALL_STATES, name);
+		if (name === "") {
+			assert.equal(miss.rule, "lowest-position", "an empty name falls back to the automatic rule");
+			continue;
+		}
+		assert.equal(miss.target, null, `--state-name ${name} must not resolve`);
+		assert.equal(miss.rule, "explicit-name-not-found");
+	}
+});
+
+await test("D9 updateIssueState writes once via issueUpdate from an unstarted state", async () => {
+	const stub = stubFetch([
+		{ body: issueBody(STATE_TODO) },
+		{ body: statesBody(ALL_STATES) },
+		{ body: updateBody(STATE_PROGRESS) },
+	]);
+	try {
+		const { payload, failure } = await stateScript.updateIssueState(KEY, ENG_7, {});
+		assert.equal(failure, null);
+		assert.equal(payload.applied, true);
+		assert.equal(payload.reason, "applied");
+		assert.equal(payload.to.name, "In Progress", "SKILL.md reads to.name straight out of stdout");
+		assert.equal(payload.from.name, "Todo");
+		assert.equal(payload.selectionRule, "lowest-position");
+		assert.equal(payload.identifier, "ENG-7");
+		assert.deepEqual(
+			payload.startedCandidates.filter((state) => state.selected).map((state) => state.id),
+			[STATE_PROGRESS.id],
+		);
+
+		assert.equal(stub.calls.length, 3, "exactly one read of the issue, one of the states, one mutation");
+		const mutation = stub.calls[2];
+		assert.match(String(JSON.parse(mutation.init.body).query), /issueUpdate/);
+		assert.deepEqual(mutation.variables, { issueId: "issue-7", stateId: STATE_PROGRESS.id });
+		// The team is read from the issue, not from LINEAR_TEAM_KEY.
+		assert.equal(stub.calls[1].variables.teamKey, "ENG");
+	} finally {
+		stub.restore();
+	}
+});
+
+await test("D9 updateIssueState is a no-op for already-started, completed and canceled issues", async () => {
+	const cases = [
+		[STATE_PROGRESS, "already-target"],
+		[STATE_REVIEW, "already-started"],
+		[STATE_MERGE, "already-started"],
+		[STATE_DONE, "terminal-state"],
+		[STATE_CANCELED, "terminal-state"],
+	];
+
+	for (const [from, reason] of cases) {
+		const stub = stubFetch([{ body: issueBody(from) }, { body: statesBody(ALL_STATES) }]);
+		try {
+			const { payload, failure } = await stateScript.updateIssueState(KEY, ENG_7, {});
+			assert.equal(failure, null);
+			assert.equal(payload.applied, false, `${from.name} must not be rewritten`);
+			assert.equal(payload.reason, reason, `${from.name} should report ${reason}`);
+			assert.equal(payload.to, null, "a no-op must not claim a destination state");
+			assert.equal(payload.from.id, from.id, "the observed state must be reported verbatim");
+			// The strongest form of "not reverted": no mutation ever left the process.
+			assert.equal(stub.calls.length, 2, `${from.name} triggered a write`);
+		} finally {
+			stub.restore();
+		}
+	}
+});
+
+await test("D9 updateIssueState reports a missing started band instead of inventing one", async () => {
+	const stub = stubFetch([
+		{ body: issueBody(STATE_TODO) },
+		{ body: statesBody([STATE_BACKLOG, STATE_TODO, STATE_DONE, STATE_CANCELED]) },
+	]);
+	try {
+		const { payload, failure } = await stateScript.updateIssueState(KEY, ENG_7, {});
+		assert.equal(failure, null, "a missing started band is a reported gap, not a usage error");
+		assert.equal(payload.applied, false);
+		assert.equal(payload.reason, "no-started-state");
+		assert.equal(payload.to, null);
+		assert.deepEqual(payload.startedCandidates, []);
+		assert.equal(stub.calls.length, 2, "no state to pick means no mutation");
+	} finally {
+		stub.restore();
+	}
+});
+
+await test("D9 --state-name overrides the position rule, and a miss fails with USAGE", async () => {
+	const stub = stubFetch([
+		{ body: issueBody(STATE_TODO) },
+		{ body: statesBody(ALL_STATES) },
+		{ body: updateBody(STATE_MERGE) },
+	]);
+	try {
+		const { payload, failure } = await stateScript.updateIssueState(KEY, ENG_7, { stateName: "ready to merge" });
+		assert.equal(failure, null);
+		assert.equal(payload.applied, true);
+		assert.equal(payload.selectionRule, "explicit-name");
+		assert.equal(stub.calls[2].variables.stateId, STATE_MERGE.id, "the named state must be written, not the leftmost one");
+	} finally {
+		stub.restore();
+	}
+
+	const miss = stubFetch([{ body: issueBody(STATE_TODO) }, { body: statesBody(ALL_STATES) }]);
+	try {
+		const { payload, failure } = await stateScript.updateIssueState(KEY, ENG_7, { stateName: "Doing" });
+		assertLinearError(failure, "USAGE");
+		assert.equal(stateScript.processExitCode(failure.code), 2, "a bad --state-name must be a re-runnable usage error");
+		assert.equal(payload.applied, false);
+		assert.equal(payload.reason, "explicit-name-not-found");
+		assert.equal(payload.requestedStateName, "Doing");
+		assert.equal(payload.to, null);
+		assert.equal(miss.calls.length, 2, "an unknown --state-name must not write anything");
+	} finally {
+		miss.restore();
+	}
+});
+
+await test("D9 updateIssueState maps missing, ambiguous and partial reads onto the exit contract", async () => {
+	const missing = stubFetch([{ body: { data: { issues: { nodes: [] } } } }]);
+	try {
+		await rejectsWithCode("NOT_FOUND", () => stateScript.updateIssueState(KEY, ENG_7, {}));
+		assert.equal(missing.calls.length, 1);
+	} finally {
+		missing.restore();
+	}
+
+	const ambiguous = stubFetch([
+		{ body: { data: { issues: { nodes: [{ id: "a", identifier: "ENG-7" }, { id: "b", identifier: "ENG-7" }] } } } },
+	]);
+	try {
+		await rejectsWithCode("CONFLICT", () => stateScript.updateIssueState(KEY, ENG_7, {}));
+	} finally {
+		ambiguous.restore();
+	}
+
+	// A truncated workflow-state list could hide the real lowest-position column: fail closed.
+	const truncated = stubFetch([
+		{ body: issueBody(STATE_TODO) },
+		{ body: statesBody([STATE_REVIEW], { hasNextPage: true, endCursor: null }) },
+	]);
+	try {
+		const error = await rejectsWithCode("GRAPHQL", () => stateScript.updateIssueState(KEY, ENG_7, {}));
+		assert.match(error.message, /partial list/);
+		assert.equal(truncated.calls.length, 2, "no mutation may follow a partial state list");
+	} finally {
+		truncated.restore();
+	}
+
+	// Linear answering success:false is not a silent no-op: it must surface as a failure.
+	const refused = stubFetch([
+		{ body: issueBody(STATE_TODO) },
+		{ body: statesBody(ALL_STATES) },
+		{ body: updateBody(STATE_PROGRESS, false) },
+	]);
+	try {
+		await rejectsWithCode("GRAPHQL", () => stateScript.updateIssueState(KEY, ENG_7, {}));
+	} finally {
+		refused.restore();
+	}
+});
+
+await test("D9 the state mutation inherits retry, because issueUpdate(stateId) is idempotent", async () => {
+	// Deliberate: a 429 on the only write in the pack must not leave the issue in Backlog.
+	// Safe because the write is an absolute field assignment and the target is chosen before the
+	// first attempt -- a replay writes the same stateId. See the RETRY POLICY comment in the script.
+	const stub = stubFetch([
+		{ body: issueBody(STATE_TODO) },
+		{ body: statesBody(ALL_STATES) },
+		{ status: 429, headers: { "retry-after": "0" }, body: { errors: [{ message: "slow down" }] } },
+		{ body: updateBody(STATE_PROGRESS) },
+	]);
+	try {
+		const { payload } = await stateScript.updateIssueState(KEY, ENG_7, {});
+		assert.equal(payload.applied, true);
+		assert.equal(stub.calls.length, 4);
+		assert.deepEqual(stub.calls[2].variables, stub.calls[3].variables, "a retry must not re-select the target state");
+	} finally {
+		stub.restore();
+	}
+
+	// A GraphQL-level error on a mutation still fails closed rather than being treated as partial.
+	const partial = stubFetch([
+		{ body: issueBody(STATE_TODO) },
+		{ body: statesBody(ALL_STATES) },
+		{ body: { data: { issueUpdate: null }, errors: [{ message: "field unavailable" }] } },
+	]);
+	try {
+		await rejectsWithCode("GRAPHQL", () => stateScript.updateIssueState(KEY, ENG_7, {}));
+	} finally {
+		partial.restore();
+	}
+});
+
+await test("D9 update-issue-state parseArgs preserves the documented CLI surface", () => {
+	assert.deepEqual(stateScript.parseArgs(["ENG-7"]), { identifier: "ENG-7", stateName: "", wantHelp: false });
+	assert.equal(stateScript.parseArgs(["ENG-7", "--state-name", " In Review "]).stateName, "In Review");
+	assert.equal(stateScript.parseArgs(["--state-name=In Review", "ENG-7"]).stateName, "In Review");
+	assert.equal(stateScript.parseArgs(["-h"]).wantHelp, true);
+	assert.equal(stateScript.parseArgs(["--help"]).wantHelp, true);
+	assert.equal(stateScript.parseArgs(["ENG-7", "-h"]).wantHelp, true);
+
+	throwsWithCode("USAGE", () => stateScript.parseArgs([]));
+	throwsWithCode("USAGE", () => stateScript.parseArgs(["ENG-7", "ENG-8"]));
+	throwsWithCode("USAGE", () => stateScript.parseArgs(["ENG-7", "--bogus"]));
+	throwsWithCode("USAGE", () => stateScript.parseArgs(["ENG-7", "--state-name"]));
+	throwsWithCode("USAGE", () => stateScript.parseArgs(["ENG-7", "--state-name", "--compact"]));
+	throwsWithCode("USAGE", () => stateScript.parseArgs(["ENG-7", "--state-name="]));
+	throwsWithCode("USAGE", () => stateScript.parseArgs(["ENG-7", "--state-name", "A", "--state-name", "B"]));
+	throwsWithCode("USAGE", () => stateScript.parseArgs(["ENG-7", "--state-name=A", "--state-name=B"]));
+
+	// Hostile argv is quoted and de-controlled before it reaches stderr.
+	const hostile = throwsWithCode("USAGE", () => stateScript.parseArgs([`--evil${CONTROL}flag`]));
+	assert.ok(!hostile.message.includes(CONTROL), "an unknown flag leaked a control character");
+});
+
+await test("D9 update-issue-state collapses the EXIT table onto the documented 0/1/2 surface", () => {
+	// SKILL.md Step 2.6 branches on exactly three codes, and 1 means "continue anyway".
+	assert.equal(stateScript.processExitCode("OK"), 0);
+	assert.equal(stateScript.processExitCode("USAGE"), 2);
+	for (const code of ["UNKNOWN", "NOT_FOUND", "AUTH", "RATE_LIMIT", "NETWORK", "GRAPHQL", "CONFLICT", "TOO_LARGE", "NOPE"]) {
+		assert.equal(stateScript.processExitCode(code), 1, `${code} must collapse onto "not updated, continue"`);
+	}
+
+	const source = readFileSync(resolve(root, "skills/linear-to-pr/scripts/update-issue-state.mjs"), "utf8");
+	// The pre-hardening version exited from inside the reporting path, which truncated a piped
+	// stdout; the contract now runs through process.exitCode only.
+	assert.ok(!/process\.exit\(/.test(source), "use process.exitCode so a piped stdout is flushed");
+	assert.ok(!/console\.error|console\.log/.test(source), "failures must use the JSON envelope, not console");
+	// Duplicated transport helpers must be gone, not merely unused.
+	for (const dead of ["async function graphql", "function authHeader", "async function resolveApiKey", "async function readKeyFile"]) {
+		assert.ok(!source.includes(dead), `${dead} is still a local copy; import it from lib-linear.mjs`);
+	}
+	assert.match(source, /from "\.\/lib-linear\.mjs"/, "the script must use the shared transport");
 });
 
 /* --------------------------------- extra: determinism and derivations */
@@ -1050,8 +1373,8 @@ await test("fetch parseArgs validates presets, counts and the -- sentinel", () =
 	throwsWithCode("USAGE", () => fetchScript.parseArgs(["ENG-1", "--fields"]));
 });
 
-await test("both CLIs print help to stdout and select exit 0", () => {
-	for (const script of [fetchScript, postScript]) {
+await test("all three CLIs print help to stdout and select exit 0", () => {
+	for (const script of [fetchScript, postScript, stateScript]) {
 		const chunks = [];
 		const originalWrite = process.stdout.write;
 		const originalExitCode = process.exitCode;
@@ -1083,4 +1406,4 @@ if (failures.length) {
 	process.exit(1);
 }
 
-console.log(`Linear scripts OK (${passed} tests: drift guard, identifier parsing, redaction, auth header, markers, stubbed transport, TLS guard, exit codes)`);
+console.log(`Linear scripts OK (${passed} tests: drift guard, identifier parsing, redaction, auth header, markers, stubbed transport, TLS guard, exit codes, state writeback)`);

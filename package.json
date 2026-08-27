@@ -36,7 +36,7 @@
 		"typebox": "*"
 	},
 	"scripts": {
-		"check": "node --check skills/linear-to-pr/scripts/lib-linear.mjs && node --check skills/linear-pr-audit/scripts/lib-linear.mjs && node --check skills/linear-to-pr/scripts/fetch-linear-issue.mjs && node --check skills/linear-pr-audit/scripts/post-linear-comment.mjs && node tests/package-structure.mjs && node tests/linear-scripts.mjs && node tests/skill-snippets.mjs",
+		"check": "node --check skills/linear-to-pr/scripts/lib-linear.mjs && node --check skills/linear-pr-audit/scripts/lib-linear.mjs && node --check skills/linear-to-pr/scripts/fetch-linear-issue.mjs && node --check skills/linear-to-pr/scripts/update-issue-state.mjs && node --check skills/linear-pr-audit/scripts/post-linear-comment.mjs && node tests/package-structure.mjs && node tests/linear-scripts.mjs && node tests/skill-snippets.mjs",
 		"test:skill": "node tests/package-structure.mjs",
 		"test:linear": "node tests/linear-scripts.mjs",
 		"test:snippets": "node tests/skill-snippets.mjs"
