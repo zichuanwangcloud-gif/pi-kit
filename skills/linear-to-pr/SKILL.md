@@ -25,6 +25,7 @@ metadata:
 - `--base <branch>` 指定 PR base；`--worktree-root <path>` 指定 worktree 根目录
 - `--dry-run` 只产出审阅卡/理解卡/实施计划，不建 worktree、不改代码
 - `--no-pr` 做到提交并 push 任务分支为止，不创建 PR
+- `--no-status` 关闭 Issue 状态回写；`--state-name "<状态名>"` 覆盖自动匹配
 
 示例：`/skill:linear-to-pr ENG-123 --base develop`、`/skill:linear-to-pr 123 --dry-run`（后者需 `LINEAR_TEAM_KEY`）。
 
@@ -45,7 +46,7 @@ metadata:
 | 2 | **任务分支必须从已确认的 `origin/<base>` 创建**，不用可能过期的本地分支 | `git -C "$WT" merge-base --is-ancestor "origin/$BASE" HEAD` |
 | 3 | **不触碰主工作区的任何改动**，不 reset/clean/stash/覆盖 | Step 0 把 `status --porcelain=v1 \| sha256sum` 与 `HEAD` 固化成 `FP0`/`HEAD0` 写进 `$ENVFILE`，Step 8 用 `[ "$FP1" = "$FP0" ]` 机器比对（跨 `bash` 调用靠肉眼对比两次输出不成立） |
 | 4 | **凭据不外泄**。`LINEAR_API_KEY` 只允许发往 `api.linear.app` | key 不出现在命令行、日志、commit、PR body、聊天；临时文件 `umask 077` |
-| 5 | **不做未授权的外部动作**：不 merge/approve/ready PR、不回写 Linear、不部署 | 收尾报告逐条列出本次全部写操作 |
+| 5 | **不做未授权的外部动作**：不 merge/approve/ready PR、不部署。Linear 侧**只允许** Step 2.6 的一次性状态写入（`--no-status` 可关闭），不写评论、不改标题/负责人/优先级/标签等任何其他字段 | 收尾报告逐条列出本次全部写操作 |
 
 其余流程性约束写在各 Step 内。自动化失败时保留 worktree、分支和 commit，报告真实状态，不用更危险的操作兜底。
 
@@ -292,6 +293,24 @@ gh pr list --head "$BR" --state all --json url,state,baseRefName,headRefName
 
 **确认是本次任务残留时必须恢复，不得要求用户手工清理后从零重跑。**
 
+## Step 2.6：把 Issue 标记为进行中
+
+计划确认后一次性写入，`--no-status` 时跳过。只写状态，不写评论，不改其他字段。
+
+```bash
+set -euo pipefail; . /tmp/pi-linear-to-pr-<issue-lower>.env
+: "${ISSUE:?}"
+node "<skill目录>/scripts/update-issue-state.mjs" "$ISSUE"
+```
+
+目标状态取该团队 `type=started` 候选中 `position` 最小者。已是 `started`（含 In Review 等更靠后的列）
+不改也不回退；`completed`/`canceled` 不改；无候选不猜。完整规则与退出码处置见
+`references/pr-output.md` §Linear 关联与副作用。
+
+按退出码处理：`0` 读 stdout JSON 的 `applied`/`reason`/`to.name` 记入收尾报告；
+`1` 状态未更新但**继续后续步骤**，把错误原文记入报告，不重试、不换状态兜底；
+`2` 参数有误，修正后只重跑一次。
+
 ## Step 3：创建隔离 worktree
 
 阶段二 env 文件已在 Step 2.c 写好（见「执行期约定」），本步只 source：
@@ -434,7 +453,7 @@ git -C "$WT" --no-pager show --stat --oneline HEAD
 
 ## 有效确认的判定
 
-用户确认理解卡和实施计划，即授权验证通过后自动提交、普通 push 当前任务分支并创建到已确认 base 的 PR。授权不包括 force push、直推受保护分支、合并/approve/ready PR、主动回写 Linear、部署或其他未说明的外部动作。
+用户确认理解卡和实施计划，即授权验证通过后自动提交、普通 push 当前任务分支、创建到已确认 base 的 PR，以及把本 Issue 一次性置为该团队 `type=started` 的状态（`--no-status` 可关闭）。授权不包括 force push、直推受保护分支、合并/approve/ready PR、回写 Linear 评论、修改标题/负责人/优先级/标签等其他 Issue 字段、部署或其他未说明的外部动作。
 
 **什么算有效确认（三条全满足）**：
 

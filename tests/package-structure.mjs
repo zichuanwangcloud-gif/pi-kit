@@ -32,6 +32,7 @@ const required = [
 	"skills/feature-trace/SKILL.md",
 	"skills/linear-to-pr/SKILL.md",
 	"skills/linear-to-pr/scripts/fetch-linear-issue.mjs",
+	"skills/linear-to-pr/scripts/update-issue-state.mjs",
 	"skills/pr-audit/SKILL.md",
 	"skills/linear-pr-audit/SKILL.md",
 	"skills/linear-pr-audit/scripts/post-linear-comment.mjs",
@@ -113,6 +114,28 @@ for (const rule of requiredAutoPrRules) {
 	if (!carries(linearSkill, rule)) throw new Error(`linear-to-pr is missing auto-PR rule: ${rule}`);
 }
 
+// Status writeback: these three invariants regress silently if someone
+// "simplifies" the matching rule, drops the opt-out, or widens the grant.
+const requiredStatusRules = [
+	"type=started",
+	"--no-status",
+	"回写 Linear 评论",
+];
+for (const rule of requiredStatusRules) {
+	if (!linearSkill.includes(rule)) throw new Error(`linear-to-pr is missing status rule: ${rule}`);
+}
+
+// The read-only fetch path must stay mutation-free: pr-audit promises it never
+// runs a Linear mutation, and that promise is only verifiable at file level.
+const fetchScript = await readFile(resolve(root, "skills/linear-to-pr/scripts/fetch-linear-issue.mjs"), "utf8");
+if (/\bmutation\b|issueUpdate/.test(fetchScript)) {
+	throw new Error("fetch-linear-issue.mjs must stay read-only; put mutations in update-issue-state.mjs");
+}
+const stateScript = await readFile(resolve(root, "skills/linear-to-pr/scripts/update-issue-state.mjs"), "utf8");
+if (!/issueUpdate/.test(stateScript) || !/"started"/.test(stateScript)) {
+	throw new Error("update-issue-state.mjs must set the issue to its team's started state via issueUpdate");
+}
+
 const prAuditSkill = await readFile(resolve(root, "skills/pr-audit/SKILL.md"), "utf8");
 const requiredAuditRules = [
 	"三个 Gate 都必须 `PASS`，即 **3 PASS**",
@@ -156,6 +179,43 @@ const requiredLinearPrAuditRules = [
 ];
 for (const rule of requiredLinearPrAuditRules) {
 	if (!carries(linearPrAuditSkill, rule)) throw new Error(`linear-pr-audit is missing policy: ${rule}`);
+}
+// PR #2 removed the letter grade scale as redundant with gate status. Kept instead, because
+// linear-pr-audit uses the grade CEILING as its disclosure channel for "passed, with caveats"
+// (waiver -> A, author self-signed -> B, auditor pushed commits -> A). Gate status alone is
+// binary and cannot carry that. The scale is asserted present above; do not re-add a ban here.
+
+// PR #2 enforced a 150/180-line trunk here. Raised to the universal 500-line check above,
+// deliberately: the Agent Skills budget anchor is 500 (Anthropic best practices, the agentskills.io
+// spec, and Cursor rules all converge there), and an adversarial audit of the hardening pass
+// required specific load-bearing rules to stay INLINE in the trunk rather than in references/ --
+// the gate form, the mock-in-diff-surface ban, "absolute thresholds must not be judged on the audit
+// machine", and the grade-ceiling list. A 150-line trunk cannot hold those. The audit also found
+// that the MANDATORY-read reference set grew faster than the trunk shrank, so more aggressive
+// extraction is not automatically cheaper. Revisit by observing which references a real run opens.
+
+// Portability and shell-compatibility regressions caught in review.
+for (const path of [...developmentSkills, "feature-trace", "linear-to-pr", "pr-audit", "linear-pr-audit"]) {
+	const files = [`skills/${path}/SKILL.md`];
+	for (const file of files) {
+		const content = await readFile(resolve(root, file), "utf8");
+		// Only executable code counts. Prose and inline-code MENTIONS of a banned construct are how
+		// the skill documents the ban, and a line that forbids a pattern necessarily contains it.
+		// So: scan inside ```bash fences only, with trailing comments stripped.
+		const code = [...content.matchAll(/^```bash\n([\s\S]*?)^```/gm)]
+			.flatMap((m) => m[1].split(/\r?\n/))
+			.map((line) => line.replace(/#.*$/, ""))
+			.join("\n");
+		if (/find\s+\.\.\s/.test(code)) {
+			throw new Error(`${file} scans the parent directory; scope discovery to the current repository`);
+		}
+		if (/\$\{[A-Za-z_][A-Za-z0-9_]*,,\}/.test(code)) {
+			throw new Error(`${file} uses bash 4+ case conversion; use tr for portability`);
+		}
+		if (/loop-blocked/.test(content)) {
+			throw new Error(`${file} emits <loop-blocked>, which only the engineering-loop extension parses; ask the user directly`);
+		}
+	}
 }
 
 const discoverabilityFiles = ["README.md", "docs/MIGRATION.md", "docs/experience/development-skills.md", "extensions/kit-help.ts"];

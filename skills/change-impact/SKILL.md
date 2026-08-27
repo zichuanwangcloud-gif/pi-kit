@@ -1,6 +1,6 @@
 ---
 name: change-impact
-description: 分析分支、commit、PR 或拟议改动的影响半径，沿依赖、运行时入口、数据、配置、测试和运维边界建立证据图并给出风险与验证建议。用于“这个改动影响哪里”“回归范围”“谁会被影响”“改动风险评估”等请求。
+description: 分析分支、commit、PR 或拟议改动的影响半径，沿依赖、运行时入口、数据、配置、测试和运维边界建立证据图并给出风险与验证建议。用于“这个改动影响哪里”“回归范围”“谁会被影响”“改动风险评估”等请求。本 Skill 面向泛化的影响半径分析；只看 API 契约兼容性用 `api-contract-audit`，只看数据迁移用 `schema-migration-audit`，只看测试覆盖缺口用 `test-gap`，已开 PR 的完整合并门禁用 `pr-audit`。
 compatibility: Requires a readable git checkout. Optional PR metadata requires a read-authenticated repository CLI; repository structure and commands are discovered at runtime.
 allowed-tools: read bash
 metadata:
@@ -70,10 +70,19 @@ metadata:
 
 优先运行不会改变外部状态的现有 dependency graph、typecheck、dry-run、list-tests 或静态命令。先阅读脚本；可能生成文件/依赖时用隔离环境。不得安装未知工具，不运行发布、部署或生产查询。缺失依赖记 `BLOCKED`，静态追踪仍继续。
 
+## Gate
+
+- `PASS`：影响面已完整追踪，风险有对应验证覆盖，无阻断发现；
+- `FAIL`：存在未受控的 breaking 影响、不可逆数据风险或无回滚路径的高风险项；
+- `BLOCKED`：关键依赖图、消费者或运行时可达性证据缺失，无法可信判断。
+
 ## 输出
 
 ```markdown
 # Change Impact 报告
+## 结论
+- Gate：PASS / FAIL / BLOCKED
+
 ## 范围与版本
 - 类型：实际 diff / 拟议变更
 - Base/head：...

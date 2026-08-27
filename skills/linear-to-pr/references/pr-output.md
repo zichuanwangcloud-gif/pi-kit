@@ -159,3 +159,23 @@ PR body 首行的 magic word 决定状态自动化的强度，按用户意图选
 
 用户要求完全避免自动化时：改用不含 identifier 的分支名与标题，并在 body 中用纯文本引用 Issue。
 注意写在 PR **评论**里的 magic word 不建立关联，只有 body 生效。
+
+### Issue 状态回写（Step 2.6）
+
+`scripts/update-issue-state.mjs` 只做一件事：把 Issue 置为该团队 `type=started` 的状态。
+
+| 情形 | 动作 |
+|---|---|
+| 当前状态 `type` 为 `backlog`/`unstarted`/`triage` | 置为 `type=started` 中 `position` 最小的那个 |
+| 当前已是 `started`（含 In Review 等更靠后的列） | **不改、不回退** |
+| 当前为 `completed`/`canceled` | 不改（Step 1.0 本应已在此停止） |
+| 该团队没有 `type=started` 候选 | 不猜、不新建状态，记为缺口 |
+
+退出码即契约：`0` 成功（读 stdout JSON 的 `applied`/`reason`/`to.name`）；`1` 未更新但流程继续
+（错误原文进报告，**不重试、不换状态兜底**）；`2` 参数有误（修正后只重跑一次）。
+
+边界：只写状态。**不写评论**，不改标题、负责人、优先级、标签、估点或任何其他字段。
+`--no-status` 完全关闭本步；`--state-name "<状态名>"` 覆盖自动匹配（用于状态列命名不规范的团队）。
+
+与「Linear 侧副作用披露」的关系：本步是本 Skill **主动**发起的唯一 Linear 写操作，必须在 Step 2
+的计划里明示；而分支名/PR 标题触发的状态推进是 GitHub 集成的**被动**副作用，两者都要披露，不要混为一谈。

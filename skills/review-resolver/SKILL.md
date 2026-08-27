@@ -1,6 +1,6 @@
 ---
 name: review-resolver
-description: 汇总 PR 或代码审查意见，验证每条意见在当前 head 上是否成立，去重并形成解决计划；仅在用户明确授权且确认计划后，才可在隔离任务工作区修改代码并验证。用于“处理 review comments”“逐条解决审查意见”“review 反馈是否合理”等请求。
+description: 汇总 PR 或代码审查意见，验证每条意见在当前 head 上是否成立，去重并形成解决计划；仅在用户明确授权且确认计划后，才可在隔离任务工作区修改代码并验证。用于“处理 review comments”“逐条解决审查意见”“review 反馈是否合理”等请求。仅用于处理已有的 review 意见；主动审计 PR 请用 `pr-audit`。
 compatibility: Requires a readable git checkout. Reading hosted review threads may require the repository's authenticated CLI. Editing requires an isolated task branch or worktree and explicit user approval of the proposed plan.
 allowed-tools: read bash edit write
 metadata:
@@ -43,7 +43,7 @@ metadata:
 
 ## 3. 风险与解决方案
 
-对 `VALID` 意见说明：问题触发条件、影响、最小修复、兼容性、应加测试及验证命令来源。检查多条建议是否冲突、是否要求 schema/API/迁移/安全决策。产品或安全取舍不能由 Skill 猜测，使用 `<loop-blocked>问题</loop-blocked>` 或普通问题等待决定。
+对 `VALID` 意见说明：问题触发条件、影响、最小修复、兼容性、应加测试及验证命令来源。检查多条建议是否冲突、是否要求 schema/API/迁移/安全决策。产品或安全取舍不能由 Skill 猜测，应停止并向用户明确提出待决问题，等待答复后再继续。
 
 输出确认卡：
 

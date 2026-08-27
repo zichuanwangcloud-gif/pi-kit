@@ -166,7 +166,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 							"/skill:linear-to-pr ENG-123 --base develop",
 							"/skills linear-to-pr ENG-123 --base develop",
 							"/skill:linear-to-pr ENG-123 --dry-run — 只出审阅卡、理解卡和计划，不建 worktree、不改代码。",
-							"/skill:linear-to-pr ENG-123 --no-pr — 做到提交并 push 任务分支为止，PR 文本只输出不创建。",
+							"/skill:linear-to-pr ENG-123 --no-pr / --no-status / --state-name — 做到提交并 push 任务分支为止，PR 文本只输出不创建。",
 							"/skill:linear-to-pr ENG-123 --worktree-root <path> — 指定 worktree 存放根目录。",
 							"完整 identifier 最可靠；裸数字需要 LINEAR_TEAM_KEY。",
 						],

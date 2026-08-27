@@ -1,6 +1,6 @@
 ---
 name: dependency-upgrade
-description: 分析依赖升级提案或现有依赖 diff，核对版本、锁文件、兼容性、漏洞、许可证、供应链、迁移说明和验证范围，形成安全升级计划。用于“升级这个依赖”“依赖更新风险”“lockfile 审查”“安全补丁怎么升”等请求。
+description: 分析依赖升级提案或现有依赖 diff，核对版本、锁文件、兼容性、漏洞、许可证、供应链、迁移说明和验证范围，形成安全升级计划。用于“升级这个依赖”“依赖更新风险”“lockfile 审查”“安全补丁怎么升”等请求。本 Skill 只做依赖版本升级风险评估；泛化的改动影响面用 `change-impact`。
 compatibility: Requires a readable git checkout. Package managers, registries, advisory sources, lockfile tools, and test commands are discovered from repository configuration; network access is optional and must remain read-only.
 allowed-tools: read bash
 metadata:
@@ -28,7 +28,7 @@ metadata:
 
 不根据 lockfile 文件名直接运行常见命令；先从 `packageManager`、wrapper、项目文档和 CI 确认。
 
-## 2. 审计已有 diff或解析当前图
+## 2. 审计已有 diff 或解析当前图
 
 完整阅读 manifest+lock diff，检查：
 
@@ -61,12 +61,12 @@ metadata:
 
 沿代码搜索实际使用的 import/API/config；文本无命中不代表动态/plugin 用法不存在。建立 breaking item→调用点→改法→测试映射。结合 change impact 选择：目标单测、类型/编译、集成/contract/e2e、平台 matrix、性能/包体、启动/迁移和 security/license scan。
 
-已有升级 diff可运行项目真实检查，前提是脚本已审阅且不写外部状态；依赖缺失不自动安装，记录后继续 `git diff --check` 等静态检查。测试需隔离，不能污染主工作区。
+已有升级 diff 可运行项目真实检查，前提是脚本已审阅且不写外部状态；依赖缺失不自动安装，记录后继续 `git diff --check` 等静态检查。测试需隔离，不能污染主工作区。
 
 ## 5. 结论
 
-- `READY`：目标明确、上游和图谱风险已审阅、兼容改动及验证充分；
-- `CHANGES_REQUIRED`：已确认 breaking、lock 异常、安全/许可证或测试缺口；
+- `PASS`：目标明确、上游和图谱风险已审阅、兼容改动及验证充分；
+- `FAIL`：已确认 breaking、lock 异常、安全/许可证或测试缺口；
 - `BLOCKED`：registry/上游、工具链、图谱或关键验证证据缺失。
 
 ## 输出
@@ -74,7 +74,7 @@ metadata:
 ```markdown
 # Dependency Upgrade 报告
 ## 结论
-- READY / CHANGES_REQUIRED / BLOCKED
+- Gate：PASS / FAIL / BLOCKED
 - `<package>`：current → target（direct/transitive, runtime/dev）
 
 ## 依赖图与 lockfile 变化
