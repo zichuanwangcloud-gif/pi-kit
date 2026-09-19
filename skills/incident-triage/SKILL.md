@@ -1,6 +1,6 @@
 ---
 name: incident-triage
-description: 对服务事件、告警、错误激增或回归进行安全的只读初步响应，建立时间线、范围、证据与假设，提出低风险缓解和升级建议。用于“线上故障排查”“incident triage”“告警为什么响”“错误率突然上升”等请求。
+description: 对服务事件、告警、错误激增或回归进行安全的只读初步响应，建立时间线、范围、证据与假设，提出低风险缓解和升级建议。用于“线上故障排查”“incident triage”“告警为什么响”“错误率突然上升”等请求。仅用于线上服务事故初排；CI 构建/流水线失败请用 `ci-triage`。
 compatibility: Requires repository and/or incident evidence supplied by the user. Observability or incident-system access is optional, read-only, and governed by the target project's runbooks and data-handling rules.
 allowed-tools: read bash invoke_skill
 metadata:
@@ -62,7 +62,7 @@ metadata:
 - 中高风险：rollback、flag、scale、failover、data repair 必须由 runbook 和授权 operator 决定；
 - 删除/重放/补数据、禁用安全控制、修改保留策略等不得由 Skill 建议为无条件快捷修复。
 
-需要产品、安全、数据或可用性权衡时输出 `<loop-blocked>需要 incident owner 决定的问题</loop-blocked>`。不得在本 Skill 中执行缓解。
+需要产品、安全、数据或可用性权衡时，停止并向用户明确提出需要 incident owner 决定的问题，等待答复后再继续。不得在本 Skill 中执行缓解。
 
 ## 6. 根因声明标准
 

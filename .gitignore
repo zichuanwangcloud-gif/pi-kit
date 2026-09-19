@@ -6,3 +6,5 @@ node_modules/
 .env.*
 credentials/
 secrets/
+dist/
+.claude/worktrees/

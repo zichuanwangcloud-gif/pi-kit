@@ -1,6 +1,6 @@
 ---
 name: ci-triage
-description: 调查 CI 失败、卡住或不稳定的检查，关联日志、变更与仓库工作流，输出可复现根因、责任范围和修复建议。用于“CI 为什么失败”“检查一直 pending”“flaky job”“构建红了”等只读排障请求。
+description: 调查 CI 失败、卡住或不稳定的检查，关联日志、变更与仓库工作流，输出可复现根因、责任范围和修复建议。用于“CI 为什么失败”“检查一直 pending”“flaky job”“构建红了”等只读排障请求。仅用于 CI/流水线失败排障；线上服务事故请用 `incident-triage`，PR 合并门禁审计请用 `pr-audit`。
 compatibility: Requires a readable git checkout. Hosted-run metadata may require the repository's authenticated read-only CLI; local tools and commands are discovered from repository documentation and CI configuration.
 allowed-tools: read bash
 metadata:
@@ -26,7 +26,7 @@ metadata:
 git rev-parse --show-toplevel
 git status --short --branch
 git remote -v
-find .. -name AGENTS.md -o -name CLAUDE.md
+find . -maxdepth 3 \( -name AGENTS.md -o -name CLAUDE.md \) -not -path './.git/*'
 ```
 
 随后按仓库实际内容定位 workflow/pipeline 配置、构建清单、锁文件、测试配置和脚本。GitHub Actions、GitLab CI、Buildkite、Jenkins 等只是候选，不假定平台。记录项目规定的日志入口、required checks、重试策略、生成代码和测试命令。

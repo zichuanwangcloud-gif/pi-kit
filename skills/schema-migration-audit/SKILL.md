@@ -1,6 +1,6 @@
 ---
 name: schema-migration-audit
-description: 审计数据库、事件、配置或其他持久化 schema 迁移的兼容性、数据安全、执行顺序、回滚、锁与发布风险，输出证据化门禁报告。用于“migration 安全吗”“schema 变更审查”“数据库发布风险”“迁移回滚评估”等请求。
+description: 审计数据库、事件、配置或其他持久化 schema 迁移的兼容性、数据安全、执行顺序、回滚、锁与发布风险，输出证据化门禁报告。用于“migration 安全吗”“schema 变更审查”“数据库发布风险”“迁移回滚评估”等请求。本 Skill 只做持久化 schema 与数据迁移审计；API 层契约兼容性用 `api-contract-audit`。
 compatibility: Requires a readable git checkout. Database engines, migration frameworks, dry-run commands, and deployment conventions are discovered from repository files; production access is neither required nor permitted by default.
 allowed-tools: read bash
 metadata:
