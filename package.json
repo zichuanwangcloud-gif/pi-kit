@@ -1,6 +1,6 @@
 {
 	"name": "pi-kit",
-	"version": "0.7.0",
+	"version": "0.8.0",
 	"private": true,
 	"type": "module",
 	"description": "Portable, project-agnostic Pi extensions, agent skills, and engineering workflows.",
@@ -10,6 +10,7 @@
 		"engineering-workflows",
 		"pull-request-audit",
 		"acceptance-audit",
+		"pull-request-verification",
 		"ci-triage",
 		"code-review",
 		"change-impact",
@@ -36,7 +37,7 @@
 		"typebox": "*"
 	},
 	"scripts": {
-		"check": "node --check skills/linear-to-pr/scripts/lib-linear.mjs && node --check skills/linear-pr-audit/scripts/lib-linear.mjs && node --check skills/linear-to-pr/scripts/fetch-linear-issue.mjs && node --check skills/linear-to-pr/scripts/update-issue-state.mjs && node --check skills/linear-pr-audit/scripts/post-linear-comment.mjs && node tests/package-structure.mjs && node tests/linear-scripts.mjs && node tests/skill-snippets.mjs",
+		"check": "node --check skills/linear-to-pr/scripts/lib-linear.mjs && node --check skills/linear-pr-audit/scripts/lib-linear.mjs && node --check skills/linear-to-pr/scripts/fetch-linear-issue.mjs && node --check skills/linear-to-pr/scripts/update-issue-state.mjs && node --check skills/linear-pr-audit/scripts/post-linear-comment.mjs && bash -n skills/pr-verify/scripts/revert-check.sh && bash -n skills/pr-verify/scripts/golden-diff.sh && node tests/package-structure.mjs && node tests/linear-scripts.mjs && node tests/skill-snippets.mjs",
 		"test:skill": "node tests/package-structure.mjs",
 		"test:linear": "node tests/linear-scripts.mjs",
 		"test:snippets": "node tests/skill-snippets.mjs"
