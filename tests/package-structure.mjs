@@ -19,6 +19,7 @@ const developmentSkills = [
 	"release-readiness",
 	"dependency-upgrade",
 	"incident-triage",
+	"pr-verify",
 ];
 const required = [
 	"package.json",

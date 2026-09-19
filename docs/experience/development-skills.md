@@ -1,6 +1,6 @@
 # 通用开发 Skills：设计与使用经验
 
-Pi Kit 在既有 `feature-trace`、`linear-to-pr`、`pr-audit` 和 Engineering Loop 之外，提供九个项目中立的开发审计/排障 Skill：
+Pi Kit 在既有 `feature-trace`、`linear-to-pr`、`pr-audit` 和 Engineering Loop 之外，提供十个项目中立的开发审计/排障 Skill：
 
 | Skill | 核心问题 | 主要产出 |
 |---|---|---|
@@ -13,6 +13,7 @@ Pi Kit 在既有 `feature-trace`、`linear-to-pr`、`pr-audit` 和 Engineering L
 | `release-readiness` | 冻结候选是否具备发布证据？ | GO/NO-GO/BLOCKED 多维门禁 |
 | `dependency-upgrade` | 升级的 graph、breaking 和供应链风险是什么？ | 上游证据、lock 审计和升级验证计划 |
 | `incident-triage` | 当前事件的范围、时间线和最可信假设是什么？ | 脱敏 handoff、假设表和未执行的缓解建议 |
+| `pr-verify` | 这个 PR 的「完成」声明有多少能用原始输出证明？ | 字面验收表、Revert-check、边界/性能/故障/爆炸半径六节证据包 `REPORT.md`，验证者独立于实现者 |
 
 ## 共同架构
 
@@ -45,7 +46,7 @@ CI run、PR head、commit range、release artifact 和 incident 时间窗口都�
 
 ## 统一安全边界
 
-九个 Skill 默认：
+十个 Skill 默认：
 
 1. 不 push、force push、提交或直推保护分支；
 2. 不 comment/review/resolve/edit/merge PR，不修改 Linear/Issue；
@@ -76,6 +77,7 @@ Skill 可按证据链组合，但上层必须自行汇总结论：
 
 - CI 失败 → `ci-triage`；怀疑改动范围时补 `change-impact`；
 - PR 发布前 → `test-gap` + 适用的 schema/API/dependency 审计；
+- PR 开出后自称「完成」→ `pr-verify` 用独立验证者逐节跑证据，验收表有「需要猜」就停下来问，结果格填不出原始输出只能写 `NOT-RUN`；
 - release candidate → `release-readiness` 汇总子报告，但未运行门禁不能写 PASS；
 - incident → `incident-triage` 管理时间线/假设，只读调用变更或迁移审计，不自动执行缓解；
 - review → `review-resolver` 的分析结论可引用其他只读 Skill，最终修改仍走自己的确认闸门。
@@ -88,4 +90,4 @@ Skill 可按证据链组合，但上层必须自行汇总结论：
 - `docs/MIGRATION.md` 列安装和迁移检查；
 - package metadata 的 `pi.skills` 继续指向整个 `skills/`，Pi 按 Agent Skills 规范递归发现。
 
-结构测试校验九个目录、frontmatter 名称/描述、目录名一致、统一安全文案、review 修改闸门、帮助/README/迁移文档和 package metadata，同时保留既有 Skill 策略断言。
+结构测试校验十个目录、frontmatter 名称/描述、目录名一致、统一安全文案、review 修改闸门、帮助/README/迁移文档和 package metadata，同时保留既有 Skill 策略断言。

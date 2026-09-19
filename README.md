@@ -32,6 +32,7 @@
 | 发布就绪 | `/skill:release-readiness <candidate>` | 汇总质量、安全、运维、rollout 和 rollback 门禁 |
 | 依赖升级 | `/skill:dependency-upgrade <package|range>` | 核对版本、lockfile、上游 breaking、安全、许可证和验证计划 |
 | Incident 初排 | `/skill:incident-triage <evidence>` | 安全地建立事件范围、时间线、假设、缓解建议和交接材料 |
+| PR 六节验证 | `/skill:pr-verify <PR|range> [--only 节名]` | 字面验收表→链路贯通→Revert-check→对抗/边界→性能基线→故障矩阵→爆炸半径；验证者与实现者分离，结果格只填原始输出，否则 `NOT-RUN` |
 | Engineering Loop | `/loop` | 在当前非受保护分支中进行有完成条件的安全迭代 |
 
 ## 快速安装
@@ -160,7 +161,7 @@ Requirements Gate 只判定**静态可追溯性**——每条原子需求有没�
 
 ### 通用开发审计与排障
 
-九个新增 Skill 覆盖从 CI 到发布/事件的只读工作流：
+十个新增 Skill 覆盖从 CI 到发布/事件的只读工作流：
 
 ```text
 /skill:ci-triage <run-or-job>
@@ -172,6 +173,7 @@ Requirements Gate 只判定**静态可追溯性**——每条原子需求有没�
 /skill:release-readiness <candidate-sha-or-tag>
 /skill:dependency-upgrade <package-or-commit-range>
 /skill:incident-triage <incident-evidence>
+/skill:pr-verify <pr-or-commit-range> [--only acceptance,chain]
 ```
 
 它们先读取目标仓库说明、manifest、CI 和相关配置，再选择证据与命令；示例参数不是固定平台或项目约定。缺少 CLI、依赖、网络或权限时会标记 `BLOCKED`/未验证并继续可行的静态审计，不会编造结果或自动安装未知工具。

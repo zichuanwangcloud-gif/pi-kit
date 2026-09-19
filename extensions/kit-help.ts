@@ -124,6 +124,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 							"/skill:review-resolver <PR|comments> — 验证审查意见并形成解决计划。",
 							"/skill:change-impact <range|PR|提案> — 追踪直接与传递影响。",
 							"/skill:test-gap <range|功能> — 建立行为—测试矩阵并排序补测。",
+							"/skill:pr-verify <PR|range> [--only 节名] — 六节独立验证：字面验收表、链路贯通、revert-check、边界、性能基线、故障矩阵、爆炸半径。",
 						],
 					},
 					{
@@ -144,14 +145,14 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 					{
 						title: "统一安全边界",
 						lines: [
-							"九项能力默认只读：不 push、不修改 PR/Linear、不部署、不触碰主工作区。",
+							"十项能力默认只读：不 push、不修改 PR/Linear、不部署、不触碰主工作区。",
 							"只有 review-resolver 可在用户明确要求修复、展示计划并获确认后修改隔离任务代码。",
 							"上述确认仍不授权 push、发布 review 回复、resolve thread 或其他外部写操作。",
 						],
 					},
 				],
 				paths: skills
-					.filter((skill) => ["ci-triage", "review-resolver", "change-impact", "test-gap", "schema-migration-audit", "api-contract-audit", "release-readiness", "dependency-upgrade", "incident-triage"].includes(skill.name.replace(/^skill:/, "")))
+					.filter((skill) => ["ci-triage", "review-resolver", "change-impact", "test-gap", "schema-migration-audit", "api-contract-audit", "release-readiness", "dependency-upgrade", "incident-triage", "pr-verify"].includes(skill.name.replace(/^skill:/, "")))
 					.map((skill) => skill.sourceInfo.path),
 				createdAt: Date.now(),
 			};
@@ -318,7 +319,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 					{
 						title: "外部动作",
 						lines: [
-							"九个通用开发审计/排障 Skill 默认不 push、不改 PR/Linear、不部署、不触碰主工作区。",
+							"十个通用开发审计/排障 Skill 默认不 push、不改 PR/Linear、不部署、不触碰主工作区。",
 							"review-resolver 仅在明确修改授权、计划展示并确认、隔离任务工作区三项都满足后修改任务代码。",
 							"linear-to-pr 的既有确认闸门可授权任务分支 push/PR；合并、审批、Issue 回写、发布和部署仍需单独授权。",
 							"linear-pr-audit 的验收计划确认可授权修实现、推送修复到 PR head 分支和发送 Linear 自测报告；force push、改 PR 状态、提交临时验收测试和修改既有测试始终禁止。",
@@ -338,7 +339,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 						lines: [
 							"/help installed — 当前命令、Skill 和扩展工具。",
 							"/help skills — Skill 安装和调用。",
-							"/help development — 九个通用开发审计与排障 Skill。",
+							"/help development — 十个通用开发审计与排障 Skill。",
 							"/help linear — 通用 Linear 到 PR 工作流。",
 							"/help audit — PR 正确性、需求和安全三门审计。",
 							"/help loop — Engineering Loop。",
