@@ -34,6 +34,7 @@ cat > "$OUT/.claude-plugin/plugin.json" <<EOF
     "change-impact",
     "release-readiness",
     "incident-response",
+    "product-requirements",
     "linear"
   ],
   "license": "UNLICENSED"

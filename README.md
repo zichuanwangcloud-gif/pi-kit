@@ -19,6 +19,7 @@
 | 帮助中心 | `/help` | 动态查看已安装命令、Skill、通用安全规则和配置提示；不调用模型 |
 | 用量仪表 | 状态栏、`/usage` | 页脚实时显示上下文占用与会话成本；命令输出按模型分组的 token 用量卡片 |
 | Skill 调度 | `/skills`、`invoke_skill` | 交互或由模型按任务加载已发现的 Skill |
+| PRD 生成 | `/skill:generate-prd <功能需求>` | 对一个已明确的功能做自适应多轮访谈，产出含需求清单、Given/When/Then 验收标准、四张表和 ASCII 线框图的 PRD，并派两个独立子 agent 评审范围与可执行性 |
 | 功能溯源 | `/skill:feature-trace <描述>` | 在 Web、服务端或 monorepo 中追踪真实代码路径、UI 入口、文案和测试点 |
 | Linear → PR | `/skill:linear-to-pr TEAM-123 [--dry-run\|--no-pr]` | 先过 Issue 形态/状态闸门，分层读完全部评论与文档并输出理解卡；确认后在隔离 worktree 实现、逐包验证、推送任务分支并创建 PR，支持断点恢复 |
 | PR 三门审计 | `/skill:pr-audit 123 [--linear on]` | 只读审计正确性、可选的需求静态可追溯性和代码安全；启用 Gate 全部 PASS 后给出评级 |
@@ -237,12 +238,13 @@ skills/<name>/scripts/              该 Skill 调用的辅助脚本
 5. 参考文件本身要足够充实，否则应直接并回 `SKILL.md`。
 6. 参考文件与 `SKILL.md` 受同一套可移植性约束：不写死绝对路径、仓库名、团队 key 或公司命名空间。
 
-`tests/package-structure.mjs` 双向校验第 3–5 条，并对参考文件执行同样的可移植性检查。当前 `linear-to-pr` 与 `linear-pr-audit` 使用该约定：
+`tests/package-structure.mjs` 双向校验第 3–5 条，并对参考文件执行同样的可移植性检查。当前 `linear-to-pr`、`linear-pr-audit` 与 `generate-prd` 使用该约定：
 
 | Skill | references/ |
 |---|---|
 | `linear-to-pr` | `worktree-setup.md`、`verification.md`、`pr-output.md`、`recovery.md` |
 | `linear-pr-audit` | `write-safety.md`、`ac-taxonomy.md`、`anti-tautology.md`、`rerun-scope.md`、`report-templates.md` |
+| `generate-prd` | `prd-template.md`、`review-dispatch.md` |
 
 ## 开发与审查
 

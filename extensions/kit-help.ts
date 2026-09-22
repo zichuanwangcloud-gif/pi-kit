@@ -1,7 +1,7 @@
 import type { ExtensionAPI, SlashCommandInfo } from "@earendil-works/pi-coding-agent";
 import { Box, Text } from "@earendil-works/pi-tui";
 
-const HELP_TOPICS = ["overview", "installed", "skills", "development", "linear", "audit", "loop", "roadmap", "safety"] as const;
+const HELP_TOPICS = ["overview", "installed", "skills", "development", "product", "linear", "audit", "loop", "roadmap", "safety"] as const;
 type HelpTopic = (typeof HELP_TOPICS)[number];
 
 type HelpSection = { title: string; lines: string[] };
@@ -153,6 +153,49 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 				paths: skills
 					.filter((skill) => ["ci-triage", "review-resolver", "change-impact", "test-gap", "schema-migration-audit", "api-contract-audit", "release-readiness", "dependency-upgrade", "incident-triage"].includes(skill.name.replace(/^skill:/, "")))
 					.map((skill) => skill.sourceInfo.path),
+				createdAt: Date.now(),
+			};
+		case "product":
+			return {
+				topic,
+				title: "需求文档：PRD 生成",
+				sections: [
+					{
+						title: "入口",
+						lines: [
+							"/skill:generate-prd <功能需求> — 对一个已明确的功能生成完整 PRD。",
+							"/skills generate-prd <功能需求> — 通过调度扩展执行。",
+							"只负责新建单个功能的 PRD；想法还模糊、要拆大功能、要改存量 PRD 都不走这里。",
+						],
+					},
+					{
+						title: "项目适配",
+						lines: [
+							"PRD 根目录按「显式参数 → 项目文档 → 仓库探测 → 询问用户」解析，不预设目录树。",
+							"文件命名默认 {主题}-{功能名}-{日期}-v1.0-{状态}.md；目标仓库既有命名规则优先。",
+							"产出物红线取自项目的 CLAUDE.md / AGENTS.md；项目未定义时跳过并说明，不自行编造。",
+						],
+					},
+					{
+						title: "内容硬约束",
+						lines: [
+							"MVP 最小化：拓展项只能进排除项，需用户逐项确认才可移入需求清单。",
+							"事实底座：代码 > 前端界面 > 已有 PRD，冲突必须显式标注，未核实不得用推断补位。",
+							"术语与前端实际文案逐字一致，同一对象全文只有一个叫法。",
+							"写作红线：禁模糊词、禁 TBD、完整档验收标准 ≥ 3 条 Given/When/Then、四张表无空行。",
+							"涉及前端改动必须有 ASCII 线框图，改动型需求给出改动前/后对照。",
+						],
+					},
+					{
+						title: "评审与授权",
+						lines: [
+							"完整档必跑 Step 3B：两个子 agent 只拿 PRD 路径，不得转述访谈过程，否则评审退化成自检。",
+							"合规问题必须问用户；行业有通用答案的自决并注明依据；产品取舍一律由用户拍板。",
+							"重跑上限 1 次，同一处问题不二次发问；评审报告只输出到对话，不落盘。",
+						],
+					},
+				],
+				paths: skills.filter((skill) => skill.name === "skill:generate-prd").map((skill) => skill.sourceInfo.path),
 				createdAt: Date.now(),
 			};
 		case "linear":
@@ -339,6 +382,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 							"/help installed — 当前命令、Skill 和扩展工具。",
 							"/help skills — Skill 安装和调用。",
 							"/help development — 九个通用开发审计与排障 Skill。",
+							"/help product — 单功能 PRD 生成。",
 							"/help linear — 通用 Linear 到 PR 工作流。",
 							"/help audit — PR 正确性、需求和安全三门审计。",
 							"/help loop — Engineering Loop。",
@@ -395,7 +439,7 @@ export default function kitHelp(pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("help", {
-		description: "Pi Kit 帮助中心；用法：/help [installed|skills|development|linear|audit|loop|safety|roadmap]",
+		description: "Pi Kit 帮助中心；用法：/help [installed|skills|development|product|linear|audit|loop|safety|roadmap]",
 		getArgumentCompletions(prefix) {
 			const items = HELP_TOPICS.filter((topic) => topic.startsWith(prefix.trim().toLowerCase())).map((topic) => ({ value: topic, label: topic }));
 			return items.length ? items : null;
