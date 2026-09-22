@@ -15,6 +15,7 @@
 		"change-impact",
 		"release-readiness",
 		"incident-response",
+		"product-requirements",
 		"linear"
 	],
 	"license": "UNLICENSED",
