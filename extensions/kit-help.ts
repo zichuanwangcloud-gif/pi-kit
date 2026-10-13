@@ -172,6 +172,14 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 						],
 					},
 					{
+						title: "需求还模糊时",
+						lines: [
+							"/skill:idea-to-spec \"一句话想法或场景\" — 例子驱动多轮收敛，产出带追溯链、例子化 AC 和八项自检的 spec Markdown。",
+							"/skill:idea-to-spec --resume specs/<file>.md — 拿到需求方回复后继续收敛。",
+							"spec 不绑定任何 Issue 系统；粘贴进 Linear Issue 后即可交给 linear-to-pr。",
+						],
+					},
+					{
 						title: "项目适配",
 						lines: [
 							"Skill 不预设团队 key、仓库名称、base、分支前缀、worktree 根目录或测试命令。",
@@ -203,7 +211,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 						],
 					},
 				],
-				paths: skills.filter((skill) => skill.name === "skill:linear-to-pr").map((skill) => skill.sourceInfo.path),
+				paths: skills.filter((skill) => ["skill:linear-to-pr", "skill:idea-to-spec"].includes(skill.name)).map((skill) => skill.sourceInfo.path),
 				createdAt: Date.now(),
 			};
 		case "audit":
@@ -320,6 +328,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 						lines: [
 							"九个通用开发审计/排障 Skill 默认不 push、不改 PR/Linear、不部署、不触碰主工作区。",
 							"review-resolver 仅在明确修改授权、计划展示并确认、隔离任务工作区三项都满足后修改任务代码。",
+							"idea-to-spec 唯一的写操作是新建 spec Markdown，不改代码、不提交、不写任何 Issue 系统。",
 							"linear-to-pr 的既有确认闸门可授权任务分支 push/PR；合并、审批、Issue 回写、发布和部署仍需单独授权。",
 							"linear-pr-audit 的验收计划确认可授权修实现、推送修复到 PR head 分支和发送 Linear 自测报告；force push、改 PR 状态、提交临时验收测试和修改既有测试始终禁止。",
 						],
@@ -339,7 +348,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 							"/help installed — 当前命令、Skill 和扩展工具。",
 							"/help skills — Skill 安装和调用。",
 							"/help development — 九个通用开发审计与排障 Skill。",
-							"/help linear — 通用 Linear 到 PR 工作流。",
+							"/help linear — 通用 Linear 到 PR 工作流；需求模糊时先用 idea-to-spec 收敛成 spec。",
 							"/help audit — PR 正确性、需求和安全三门审计。",
 							"/help loop — Engineering Loop。",
 							"/help safety — 项目中立的安全规则。",
