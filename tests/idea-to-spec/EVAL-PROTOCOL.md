@@ -3,7 +3,7 @@
 每次评测跑一个用例：两个角色 agent 在各自独立上下文里交互，第三个 agent 只看产物打分。
 
 ```text
-public.md ──► 被测 agent（加载 idea-to-spec，只看 public）
+public.md + repo/ ──► 被测 agent（加载 idea-to-spec，只看 public）
                     │  提问
                     ▼
              需求方 agent（持有 hidden.md，只答不问）
@@ -19,6 +19,9 @@ public.md ──► 被测 agent（加载 idea-to-spec，只看 public）
 ## 角色一：被测 agent
 
 - 输入：`cases/<slug>/public.md` 的 `trigger` 原文，加上「加载 `idea-to-spec` 并按其流程执行」。
+- **工作目录**：`cases/<slug>/repo/`（桩仓库）。取证这一步在这里真实进行——
+  这是第 1 轮基线暴露的缺口：没有仓库时自检 ⑤ 恒失败，用例 02 更是完全测不到点上。
+  05（纯探查）无 repo，是唯一例外。
 - 禁止：读取 `hidden.md`、任何 `fixtures/` 下的文件、评测目录；禁止查看 git 历史或已被删除的用例原文。
 - 提问方式：每次向需求方 agent 提出一组问题（遵循 skill 自身的每轮 ≤3 问约束）。
 - 终止：按 skill 的规则产出 spec，或在 skill 判定停止/探查时停止。
