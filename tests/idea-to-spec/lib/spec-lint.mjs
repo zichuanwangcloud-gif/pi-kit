@@ -139,9 +139,12 @@ function checkAcceptanceCriteria(sections, findings) {
 		if (example.replace(/[—\-\s]/g, "").length < 6) {
 			findings.push({ level: "error", code: "AC-NO-EXAMPLE", message: `${id} 没有具体例子` });
 		}
-		if (!goal.match(/\bG\d+\b/)) {
+		// A criterion may legitimately serve a constraint rather than a goal ("the list endpoint's
+		// paging must not change"). Calling those orphans was a false positive on case 02.
+		const servesConstraint = /约束|非功能|兼容|不回退|不劣化/.test(goal);
+		if (!servesConstraint && !goal.match(/\bG\d+\b/)) {
 			findings.push({ level: "error", code: "AC-ORPHAN", message: `${id} 没有支撑的目标结果（孤儿 AC）` });
-		} else if (goals.size && !goals.has(goal.match(/\bG\d+\b/)[0])) {
+		} else if (goal.match(/\bG\d+\b/) && goals.size && !goals.has(goal.match(/\bG\d+\b/)[0])) {
 			findings.push({
 				level: "error",
 				code: "AC-DANGLING-GOAL",
