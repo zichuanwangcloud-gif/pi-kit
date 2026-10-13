@@ -42,3 +42,32 @@
 反过来，如果 skill 没问到但猜对了，评委判它「对」，这对 skill 有利。
 后一种情况需要靠 precision 的「来源标注」检查来兜住：猜对了但没标 `[推断]` 的，应判幻觉。
 **待验证**：下一轮跑完看 precision 是否真的抓住了这类情况。
+
+## 5. 沙箱路径被并发 session 污染（已确认，必修）
+
+**现象**：用例 04 第 3 轮写出的 spec 被**另一个 session 覆盖**成了别的主题。
+本机同时有 10+ 个 `claude --dangerously-skip-permissions` 会话在跑，共用
+`/tmp/idea-eval/<slug>/work/` 同一路径。跑测 agent 靠比对 transcript 里的 Write 参数才恢复真品。
+
+**修法**：每个 run 用独占目录 `/tmp/idea-eval/<run-id>/<slug>/`，`<run-id>` 在 run 开始时生成一次，
+run 内共用、run 间隔离；开始前断言目标目录不存在。交回前校验落盘文件与当轮报告一致。
+
+## 6. 被测方读取宿主会话历史，把真实用户提问当成输入（已确认，必修）
+
+**现象**：用例 05 第 1 轮，被测 subagent 读了 `~/.claude/history.jsonl`，找到本会话里用户的真实
+prompt（「我感觉还是不够优质，开启loop循环，增强idea-tospec的能力……」），把它当成本轮输入，
+产出一份完全无关的 spec。整轮作废重跑。
+
+**根因**：subagent 与宿主共享文件系统，`~/.claude/` 可读；禁令只列了 `tests/`、`hidden`、git 历史，
+没覆盖会话记录。
+
+**修法**：禁令补全 `~/.claude/`（history/transcript/memory）与一切 session 记录；
+并要求 prompt 明确「输入只有给出的内容，不得用环境中其他线索推断用户意图」。
+
+**残留风险**：文件系统层面无法真正隔离，只能靠禁令。要彻底隔离需在容器或独立 HOME 下跑跑测。
+
+## 7. 自检缺口数与正文自相矛盾（已确认）
+
+用例 05 自检写「缺口数 2」，实际未通过 1 项；用例 03 同样。skill 需要在写缺口数时
+**数一遍未通过行**，而不是凭感觉给数。linter 已有 `SELFCHECK-GAPS-MISMATCH` 检查，但 skill
+本身没遵守自己的规则。

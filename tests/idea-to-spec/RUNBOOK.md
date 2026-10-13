@@ -23,7 +23,17 @@ ls tests/idea-to-spec/fixtures/cases          # 用例目录
 ### 2. 起被测方 agent
 
 prompt 里只放 `public.md` 的 `trigger` 原文 + 「加载 `idea-to-spec` 并按其流程执行」+ 隔离禁令。
-禁令至少要写明：不得读取 `tests/`、`hidden`、`fixture`、`eval`、`case` 相关路径，不得看 git 历史。
+禁令必须完整列出以下来源（实测有 agent 绕过不完整的禁令）：
+
+- 不得读取 `tests/`、`hidden`、`fixture`、`eval`、`case` 相关路径
+- 不得看 git 历史（`git log`/`show`/`reflog`）
+- **不得读取 `~/.claude/` 下的任何会话记录、历史、transcript、memory**（尤其 `history.jsonl`），
+  也不得读任何其他 session 的对话记录
+- 输入**只有** prompt 里给出的 trigger 与问答记录；不得用环境中任何其他线索推断用户意图
+
+> 为什么单列第三条：实测有被测 agent 读了 `~/.claude/history.jsonl`，把宿主会话里用户的真实提问
+> 当成自己的输入，产出了一份完全无关的 spec。文件系统层面无法真正隔离，只能靠禁令；
+> 要彻底隔离需在容器或独立 HOME 下跑。
 
 这两步如果用 subagent 实现，被测方与需求方必须是**两个独立 subagent**，不能共用一个上下文——
 共用会让被测方看到 hidden，评测失效。

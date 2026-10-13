@@ -30,7 +30,14 @@ const PROVENANCE = ["用户确认", "需求方确认", "开发者判断", "推�
 // Placeholder residue: a spec that still carries these was never finished.
 const PLACEHOLDERS = ["...", "TBD", "待补充", "后续完善", "同上", "<!--", "xxx", "XXX", "待定"];
 
-const EARS_PATTERN = /(?:当.+?时|如果.+?那么|在.+?期间|系统应当|系统不应当|应支持|应返回)/;
+// EARS has five forms. The baseline run showed the original pattern rejecting legitimate
+// ones ("在任一语言下……不应当超出父容器"), so accept the whole family rather than one spelling:
+//   ubiquitous  系统应当/不应当 <行为>
+//   event       当 <事件> 时，……
+//   state       在 <状态>（期间/下/时），……
+//   option      如果 <条件>，那么……
+//   unwanted    如果 <条件>，那么系统不应当……
+const EARS_PATTERN = /(?:当[^，,]{1,60}(?:时|后|前)|如果[^，,]{1,60}那么|在[^，,]{1,60}(?:期间|下|时|内)|系统(?:应当|不应|应|必须|不得|不)|(?:应当|不应当|不得|必须))/;
 
 // --- parsing -------------------------------------------------------------------------------
 
@@ -63,6 +70,17 @@ function tableRows(lines) {
 
 function stripComments(text) {
 	return text.replace(/<!--[\s\S]*?-->/g, "");
+}
+
+// An exploration spec answers questions instead of shipping behaviour, so it legitimately has no
+// 「验收标准」/「反向推演」 sections. Judging it by the functional structure produced four
+// meaningless errors on the baseline run; detect it and swap in the checks that apply.
+function isExploration(sections, raw) {
+	const status = (sections.get("__preamble__") ?? []).join("\n");
+	if (/状态[:：]\s*探查/.test(status)) return true;
+	const first = raw.split(/\r?\n/).find((line) => line.startsWith("#")) ?? "";
+	if (/^#\s*探查/.test(first)) return true;
+	return sections.has("待回答的问题");
 }
 
 // --- checks --------------------------------------------------------------------------------
@@ -160,11 +178,14 @@ function checkReverseReasoning(sections, findings) {
 		findings.push({ level: "error", code: "REVERSE-MISSING", message: "缺少「反向推演」段" });
 		return;
 	}
-	if (!/已补\s*AC|列入范围外|范围外/.test(text)) {
+	// Each answer must be dispositioned, not necessarily in one blessed wording. The baseline
+	// run flagged a spec that wrote "已由 AC3 覆盖" / "无法补成 AC，理由…" — those ARE
+	// dispositions, so accept the equivalent phrasings.
+	if (!/已补|补成|补\s*AC|列入范围外|归入范围外|范围外|已由\s*AC\d*\s*覆盖|由\s*AC\d+\s*覆盖|已覆盖|写成\s*AC|转为\s*AC/.test(text)) {
 		findings.push({
 			level: "error",
 			code: "REVERSE-UNPROCESSED",
-			message: "反向推演没有说明每个答案的处置（补 AC 或列入范围外）",
+			message: "反向推演没有说明每个答案的处置（补 AC / 已由某 AC 覆盖 / 列入范围外）",
 		});
 	}
 }
@@ -211,7 +232,7 @@ function checkSelfCheck(sections, findings) {
 	return unresolved;
 }
 
-function checkStatus(sections, findings, gaps) {
+function checkStatus(sections, findings, gaps, exploration) {
 	const text = (sections.get("__preamble__") ?? []).join("\n");
 	const status = text.match(/状态[:：]\s*(可开工|待需求方确认|草稿|探查)/);
 	if (!status) {
@@ -279,6 +300,40 @@ function checkScopeAndConstraints(sections, findings) {
 	}
 }
 
+function checkExploration(sections, findings) {
+	const questions = tableRows(sections.get("待回答的问题") ?? []).slice(1);
+	if (!questions.length) {
+		findings.push({
+			level: "error",
+			code: "EXPLORE-NO-QUESTIONS",
+			message: "探查型 spec 缺少「待回答的问题」表",
+		});
+	} else {
+		for (const cells of questions) {
+			const id = cells[0] ?? "?";
+			if (!(cells[2] ?? "").trim()) {
+				findings.push({ level: "error", code: "EXPLORE-NO-METHOD", message: `${id} 没有写回答方式` });
+			}
+			if (!(cells[3] ?? "").trim()) {
+				findings.push({ level: "error", code: "EXPLORE-NO-CRITERION", message: `${id} 没有写判定标准` });
+			}
+		}
+	}
+	// A time box is what makes an exploration safe to start; without one it is open-ended work.
+	const all = [...sections.values()].flat().join("\n");
+	if (!/时间盒|timebox|人日|天内|周内|小时/.test(all)) {
+		findings.push({ level: "error", code: "EXPLORE-NO-TIMEBOX", message: "探查型 spec 没有时间盒" });
+	}
+	// The result must say what happens next, or the exploration leads nowhere.
+	if (!/结论\s*→\s*下一步|下一步|结论与下一步/.test(all)) {
+		findings.push({
+			level: "error",
+			code: "EXPLORE-NO-NEXT-STEP",
+			message: "探查型 spec 没有「结论 → 下一步」映射",
+		});
+	}
+}
+
 // --- entry point ---------------------------------------------------------------------------
 
 /**
@@ -291,14 +346,19 @@ export function lintSpec(markdown) {
 	const doc = sections(markdown);
 	doc.set("__preamble__", preamble.split(/\r?\n/));
 
-	checkAcceptanceCriteria(doc, findings);
-	checkNegativeCriterion(doc, findings);
-	checkReverseReasoning(doc, findings);
-	checkReverseReasoningBacking(doc, findings);
+	const exploration = isExploration(doc, markdown);
+	if (exploration) {
+		checkExploration(doc, findings);
+	} else {
+		checkAcceptanceCriteria(doc, findings);
+		checkNegativeCriterion(doc, findings);
+		checkReverseReasoning(doc, findings);
+		checkReverseReasoningBacking(doc, findings);
+	}
 	const gaps = checkSelfCheck(doc, findings) ?? 0;
-	checkStatus(doc, findings, gaps);
+	checkStatus(doc, findings, gaps, exploration);
 	checkPlaceholders(doc, findings, markdown);
-	checkScopeAndConstraints(doc, findings);
+	if (!exploration) checkScopeAndConstraints(doc, findings);
 
 	const errors = findings.filter((f) => f.level === "error");
 	const warnings = findings.filter((f) => f.level === "warn");
