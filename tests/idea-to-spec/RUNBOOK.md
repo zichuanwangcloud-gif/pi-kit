@@ -91,6 +91,37 @@ node tests/idea-to-spec/lib/spec-lint.mjs <产出的 spec>
 **反脆弱提醒**：改 skill 时不要只盯召回率。让 skill 学会把所有东西都标成 `[推断]` 能骗过召回率，
 但会被准确率抓住（推断项超 1/3 时准确率封顶 0.6）。两个指标要一起看。
 
+## 改跑测链路前必做：冒烟验证
+
+**任何改动跑测脚本/夹具之后，先只跑 2 个用例，确认产物真的落盘了，再跑全量。**
+
+这条规则来自四次实测翻车（见 `HARNESS-GAPS.md`）：沙箱路径被并发覆盖、被测方读宿主历史泄题、
+提交信息与实际改动不符、**spec 因为 subagent 不写文件而从未落盘**。
+四次的共同点是「我假定了改动生效，没有验证通道」。
+
+具体做法：
+
+```bash
+# 1. 建独占 run 目录
+RUN_ID="r$(date -u +%Y%m%dT%H%M%SZ)-$$"; echo "$RUN_ID" > /tmp/idea-eval-runid
+SB="/tmp/idea-eval/$RUN_ID"; rm -rf "$SB"; mkdir -p "$SB"
+cp -R skills/idea-to-spec "$SB/skill"
+for c in tests/idea-to-spec/fixtures/cases/*/; do
+  slug=$(basename "$c"); mkdir -p "$SB/$slug/work"; cp "$c/public.md" "$SB/$slug/public.md"
+  [ -d "$c/repo" ] && cp -R "$c/repo" "$SB/$slug/repo"
+done
+
+# 2. 只跑 2 个用例（一个正常、一个高难度），断言 spec 落盘
+#    Workflow({scriptPath: 'tests/idea-to-spec/run-eval.workflow.js',
+#              args: {cases: ['01-vague-performance','07-conflicting-goals'], runId: RUN_ID}})
+#    然后：find $SB -name spec.md | wc -l  必须 ≥1
+
+# 3. 冒烟过了再跑全量 8 个
+```
+
+**不要依赖文件系统作为 agent 间传递产物的通道。** workflow subagent 的系统提示要求它把结果
+作为最终消息返回、不写文件；产物必须走结构化返回值，由脚本落盘。
+
 ## 自动化跑测（推荐）
 
 手工中继容易出错且吃上下文。用 workflow 编排，每轮的被测方与需求方都是全新 agent，
