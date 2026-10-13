@@ -9,6 +9,7 @@ Pi Kit 可以通过 Git、Git bundle 或其他可信分发方式迁移。迁移�
 - `/help`
 - `/skills` 和 `invoke_skill`
 - `feature-trace`
+- `idea-to-spec`
 - `linear-to-pr`
 - `pr-audit`
 - `linear-pr-audit`
