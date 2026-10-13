@@ -21,6 +21,7 @@ const STEP_SCHEMA = {
     kind: { type: 'string', enum: ['questions', 'spec', 'stop'] },
     questions: { type: 'string' },
     spec_path: { type: 'string' },
+    spec_markdown: { type: 'string' },
     rationale: { type: 'string' },
   },
   required: ['kind', 'questions', 'rationale'],
@@ -79,7 +80,9 @@ ${transcript || '（尚无对话，这是首轮）'}
 
 ## 你的任务（第 ${round} 轮）
 - 如果 skill 判定还需要问，返回 kind="questions"，questions 写你本轮要问的全部问题。
-- 如果 skill 判定已经可以成文，写完整 spec 到 \`${SANDBOX}/${slug}/work/spec.md\`，返回 kind="spec"，spec_path 写该路径。
+- 如果 skill 判定已经可以成文，**把完整 spec 全文放进 spec_markdown 字段返回**，kind="spec"。
+  （能写文件就同时写到 \`${SANDBOX}/${slug}/work/spec.md\`，但**返回值里的 spec_markdown 才是权威来源**——
+  本环境的 subagent 不保证落盘，所以必须把全文带回来。）
 - 如果 skill 判定必须停止（缺关键信息无法继续），返回 kind="stop"，questions 写你要停下来问的事。
 
 rationale 用一句话说明你的判断依据。严格遵守 skill 里「每轮最多 3 个问题」这类约束。`
@@ -176,6 +179,7 @@ phase('Dialogue')
 const results = await parallel(CASES.map((slug) => async () => {
   let transcript = ''
   let specPath = null
+  let specText = ''
   let status = 'exhausted'
   let rounds = 0
 
@@ -189,7 +193,12 @@ const results = await parallel(CASES.map((slug) => async () => {
     if (!step) { status = 'agent-failed'; break }
 
     if (step.kind === 'spec') {
+      // The subagent cannot be relied on to write files — its own system prompt tells it to
+      // return findings as its final message instead. So the spec text travels back in the
+      // structured result and the harness persists it. (Baseline v1 relied on file writes and
+      // silently produced zero specs.)
       specPath = step.spec_path || `${SANDBOX}/${slug}/work/spec.md`
+      specText = step.spec_markdown || ''
       status = 'spec'
       break
     }
@@ -207,14 +216,14 @@ const results = await parallel(CASES.map((slug) => async () => {
     transcript += `\n### 第 ${round} 轮\n被测方提问：\n${step.questions}\n\n需求方回答：\n${reply ? reply.answer : '（无回答）'}\n`
   }
 
-  return { slug, status, rounds, specPath, transcript }
+  return { slug, status, rounds, specPath, specText, transcript }
 }))
 
 phase('Judge')
 
 const judged = await parallel(
   results.filter(Boolean).map((run) => async () => {
-    if (!run.specPath) {
+    if (!run.specText) {
       // No spec: score the refusal instead of dropping the case from the mean.
       const refusal = await agent(refusalPrompt(run.slug, run.transcript, run.status), {
         label: `judge-refusal:${run.slug}`,
@@ -223,7 +232,13 @@ const judged = await parallel(
       })
       return { ...run, judge: null, refusal }
     }
-    const judge = await agent(judgePrompt(run.slug, run.specPath), {
+    // Persist the spec the subagent handed back, so the judge and the linter have a real file.
+    const specPath = run.specPath || `${SANDBOX}/${run.slug}/work/spec.md`
+    await agent(
+      `Write the following text verbatim to \`${specPath}\` using the Write tool. Do not modify, summarise or reformat it. Reply with just the word: written\n\n===BEGIN SPEC===\n${run.specText}\n===END SPEC===`,
+      { label: `persist:${run.slug}`, phase: 'Judge' },
+    )
+    const judge = await agent(judgePrompt(run.slug, specPath), {
       label: `judge:${run.slug}`,
       phase: 'Judge',
       schema: JUDGE_SCHEMA,

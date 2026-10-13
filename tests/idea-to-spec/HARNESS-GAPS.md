@@ -71,3 +71,18 @@ prompt（「我感觉还是不够优质，开启loop循环，增强idea-tospec�
 用例 05 自检写「缺口数 2」，实际未通过 1 项；用例 03 同样。skill 需要在写缺口数时
 **数一遍未通过行**，而不是凭感觉给数。linter 已有 `SELFCHECK-GAPS-MISMATCH` 检查，但 skill
 本身没遵守自己的规则。
+
+## 8. workflow subagent 不写文件，spec 从未落盘（已确认，必修，已修）
+
+**现象**：第 1 轮迭代评测跑满 40+ 轮对话，8 个用例只落盘 1 个 spec。基线时同样时长能出 7 个。
+
+**根因**：workflow subagent 的系统提示明确要求
+`Write report/summary/findings/analysis .md files. Return findings directly as your final assistant message`——
+即**不要写文件，把结果作为最终消息返回**。我在 prompt 里说「写 spec 到 work/spec.md」，
+agent 服从了自己的系统提示，只回一句「Writing it now.」，spec 从未落盘。
+
+**修法**：spec 全文通过结构化返回值（`spec_markdown`）带回，由 workflow 脚本落盘。
+不依赖 subagent 的文件写入能力。
+
+**教训**：跨 agent 交付产物时，**不要依赖文件系统作为传递通道**。返回值是唯一可靠的通道。
+另外：改动跑测链路时必须用小样本先验证「产物真的能拿到」，不能只看日志里有结果就假定成功。
