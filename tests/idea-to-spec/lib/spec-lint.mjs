@@ -323,16 +323,21 @@ function checkExploration(sections, findings) {
 		}
 	}
 	// A time box is what makes an exploration safe to start; without one it is open-ended work.
+	// NOTE: match against body text only. Section HEADINGS are consumed by sections() and are not
+	// in any body, so a heading-shaped requirement can never be satisfied by the heading alone —
+	// which is how the next-step check produced a false positive on a spec that had the section
+	// (HARNESS-GAPS.md #9). Section presence is checked by looking the heading up instead.
 	const all = [...sections.values()].flat().join("\n");
 	if (!/时间盒|timebox|人日|天内|周内|小时/.test(all)) {
 		findings.push({ level: "error", code: "EXPLORE-NO-TIMEBOX", message: "探查型 spec 没有时间盒" });
 	}
-	// The result must say what happens next, or the exploration leads nowhere.
-	if (!/结论\s*→\s*下一步|下一步|结论与下一步/.test(all)) {
+	// The section must exist AND carry content: an empty "结论 → 下一步" heading is not a mapping.
+	const nextSteps = sections.get("结论 → 下一步") ?? sections.get("结论→下一步");
+	if (!nextSteps || !nextSteps.join("").trim()) {
 		findings.push({
 			level: "error",
 			code: "EXPLORE-NO-NEXT-STEP",
-			message: "探查型 spec 没有「结论 → 下一步」映射",
+			message: "探查型 spec 缺少「结论 → 下一步」映射（段不存在或为空）",
 		});
 	}
 }
