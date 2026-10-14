@@ -131,6 +131,10 @@ const PLANTS = [
   { id: 'P3', keys: ['orders.ts:30'] },
   { id: 'P4', keys: ['orders_export'] },
 ]
+// Native hallucination already present in the source spec (see ANSWER-KEY.md N1). Flagging it is
+// correct, not a false positive — the first smoke run miscounted it because the script only knew
+// about the planted items.
+const NATIVE = [{ id: 'N1', keys: ['数据库直取', '人工从后台', '后台或数据库'] }]
 const caught = (r, keys) =>
   !!r && r.assertions.some((a) => a.verdict !== 'faithful' && keys.some((k) => a.text.includes(k) || a.evidence.includes(k)))
 
@@ -141,9 +145,10 @@ const calRuns = (await parallel(Array.from({ length: JUDGES }, (_, i) => () =>
 const calibration = calRuns.map((r, i) => ({
   judge: i + 1,
   caught: PLANTS.filter((p) => caught(r, p.keys)).map((p) => p.id),
+  native: NATIVE.filter((p) => caught(r, p.keys)).map((p) => p.id),
   opened: r.files_opened.length,
   falsePositives: r.assertions.filter((a) => a.verdict === 'skill_hallucination'
-    && !PLANTS.some((p) => p.keys.some((k) => a.text.includes(k) || a.evidence.includes(k)))).map((a) => a.text),
+    && ![...PLANTS, ...NATIVE].some((p) => p.keys.some((k) => a.text.includes(k) || a.evidence.includes(k)))).map((a) => a.text),
 }))
 log(`calibration: ${calibration.map((c) => `j${c.judge} ${c.caught.length}/4`).join(', ')}`)
 
