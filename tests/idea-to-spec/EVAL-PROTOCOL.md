@@ -64,3 +64,37 @@ public.md + repo/ ──► 被测 agent（加载 idea-to-spec，只看 public�
 ## 每轮迭代的停止条件
 
 连续两轮「四项加权总分」变化幅度 < 2%，且没有新增 error 级别的 linter 问题，即视为稳定，停止。
+
+---
+
+# 评委协议 v2（取代上面的「角色三」与「评分口径」）
+
+## 为什么要改
+
+v1 评委只拿 hidden.md 对照 spec，**看不到对话**。复查迭代 1 的原始对话发现：被 v1 评委判为
+「伪造引语」的 10 条里，**8 条需求方 agent 确实说过**（「你按你觉得稳的做」「20 万」「跟 IP 没关系」等）。
+需求方模拟器在 hidden 之外即兴发挥，skill 忠实记录了它，v1 却把账记在 skill 头上。
+
+加上两位 v1 评委之间 precision 平均分歧 0.156，v1 的分数不能当迭代信号。
+
+## v2 的四个改动
+
+1. **评委拿到对话记录**，每条具体断言做四分类：
+   `faithful` / `skill_hallucination`（对话与代码都没有）/ `requester_drift`（对话有、hidden 无，算模拟器的错）/
+   `mislabel`（内容属实、来源标错）。
+2. **代码断言必须实际打开文件核对**，并报告 `files_opened`。没打开不得判 faithful。
+3. **分数由脚本从分类计算**，不让评委给主观 0-1 分：
+   - precision = 1 −（skill_hallucination + 0.5 × mislabel）/ 断言总数
+   - recall =（recorded + correctly_open）/（K 总数 − requester_withheld）
+4. **每用例 3 位评委取中位数**，同时报告极差（spread）作为噪声估计。
+
+## 需求方保真审计
+
+每个用例另起一个审计 agent，只看 hidden + 对话，列出需求方说出但 hidden 无据的具体内容（drift）
+与该给没给的事实（withheld）。drift 高的用例说明夹具在污染评测，要先修需求方 prompt。
+
+## 评委校准
+
+`calibration/planted-02.spec.md` 在真实产物里植入 4 条已知幻觉（答案见 `ANSWER-KEY.md`，不给评委看）：
+伪造引语、编造阈值、错误行号、篡改文件名。后两条**只有实际打开代码才能发现**。
+每次评测先跑校准；评委找不全 4 条，该轮分数不可信。
