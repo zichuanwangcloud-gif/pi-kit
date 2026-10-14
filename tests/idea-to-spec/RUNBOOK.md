@@ -140,3 +140,28 @@ done
 - 评委只拿 `hidden.md` + spec + linter 输出，**不看对话**。
 - 沙箱 `/tmp/idea-eval/` 里只放 `skill/` 和各用例的 `public.md`，不含任何 hidden 文件，
   被测方即使乱翻也翻不到答案。
+
+## workflow 被会话中断后的恢复
+
+会话结束会杀掉正在跑的 workflow，但**已完成 agent 的结果保留在 journal 里**。
+用同一个 run-id 重新发起即可复用缓存：
+
+```js
+Workflow({ scriptPath: 'tests/idea-to-spec/judge-v2.workflow.js',
+           args: {...与上次完全相同...},      // args 变了会导致缓存全失效
+           resumeFromRunId: 'wf_<之前那个>' })
+```
+
+**恢复前先查缓存里到底有什么**：
+
+```bash
+D=~/.claude/projects/<proj>/<session>/subagents/workflows/wf_<id>
+grep -c '"type":"result"' $D/journal.jsonl      # 已完成数
+# 已完成 agent 的 label 在对应的 .meta.json 的 description 字段里
+for f in $D/agent-*.meta.json; do
+  python3 -c "import sys,json;print(json.load(open(sys.argv[1],encoding='utf-8')).get('description',''))" $f
+done | sort
+```
+
+**注意**：`args` 必须与上次逐字相同，改一个字符就会全部重跑。
+长跑（>30 分钟）的 workflow 建议拆小，或者接受中断后 resume。
