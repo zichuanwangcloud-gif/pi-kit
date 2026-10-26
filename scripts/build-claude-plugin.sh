@@ -2,8 +2,8 @@
 # 从 skills/ 重新生成 Claude Code 插件导出（dist/claude-plugin）。
 # 版本号自动对齐 package.json；Claude Code 侧通过
 #   claude plugin marketplace update pi-kit-marketplace
-#   claude plugin install pi-kit@pi-kit-marketplace
-# 完成更新。注意：pi 扩展（extensions/）无法导出为 Claude Code 插件。
+#   claude plugin update pi-kit@pi-kit-marketplace   （首次安装用 install）
+# 完成更新，之后重启会话或 /reload-plugins。注意：pi 扩展（extensions/）无法导出为 Claude Code 插件。
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -61,4 +61,4 @@ EOF
 
 COUNT=$(find "$OUT/skills" -mindepth 1 -maxdepth 1 -type d | wc -l)
 printf 'Built %s (version %s, %s skills)\n' "$OUT" "$VERSION" "$COUNT"
-printf 'Update Claude Code with:\n  claude plugin marketplace update pi-kit-marketplace\n  claude plugin install pi-kit@pi-kit-marketplace\n'
+printf 'Update Claude Code with:\n  claude plugin marketplace update pi-kit-marketplace\n  claude plugin update pi-kit@pi-kit-marketplace\n'
