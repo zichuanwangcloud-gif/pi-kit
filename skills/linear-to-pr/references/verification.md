@@ -15,6 +15,7 @@
 - [flaky 判定（唯一允许的路径）](#flaky-判定（唯一允许的路径）)
 - [无测试框架时](#无测试框架时)
 - [新增测试](#新增测试)
+- [验收测试先红后绿](#验收测试先红后绿)
 - [required status checks](#required-status-checks)
 - [结束检查](#结束检查)
 - [五态报告](#五态报告)
@@ -102,6 +103,40 @@ echo "BASE_EXIT=$BASE_EXIT"
 ## 新增测试
 
 验收标准可自动化且项目已有测试框架时，补一条覆盖该验收的测试，放到模块既有测试目录、沿用既有断言风格；否则在报告中写明未加测试的原因。禁止修改或删除既有测试来让验证变绿。
+
+测试用例直接取自理解卡里每条 AC 的**具体例子**（输入 → 期望输出），负向/边界 AC 同样要有对应用例。
+
+## 验收测试先红后绿
+
+一条在改动前就能通过的验收测试，证明不了 AC 对应的是真实问题——它可能测错了路径、断言太弱，
+或者问题根本不在 AC 描述的地方。所以新增的验收测试必须在**未改动的 `origin/$BASE`** 上跑一遍。
+复用 flaky 判定的一次性 detached worktree，把本次新增的测试文件复制过去：
+
+```bash
+set -euo pipefail; . /tmp/pi-linear-to-pr-<issue-lower>.env
+: "${ROOT:?}" "${WT:?}" "${BASE:?}"
+TMPWT="${WT}-red-$$"
+git -C "$ROOT" worktree add --detach "$TMPWT" "origin/$BASE" \
+  || { echo "STOP: 基线 worktree 建立失败"; exit 1; }
+for T in <本次新增的测试文件相对路径...>; do
+  mkdir -p "$TMPWT/$(dirname "$T")"; cp "$WT/$T" "$TMPWT/$T"
+done
+set +e                                  # 必须取回非零退出码
+( cd "$TMPWT" && <只跑新增验收测试的最小命令> ) > "$WT/.pi-verify-red.log" 2>&1; RED_EXIT=$?
+set -e
+git -C "$ROOT" worktree remove --force "$TMPWT"
+echo "RED_EXIT=$RED_EXIT"; tail -40 "$WT/.pi-verify-red.log"
+```
+
+| 结果 | 判定 |
+|---|---|
+| `RED_EXIT` 非 0，失败断言对应 AC 描述的行为 | **红**：测试抓住了问题，继续在 `$WT` 上验证绿 |
+| `RED_EXIT` 非 0，但只因引用了本次新增的符号/模块而无法编译或导入 | **结构性红**：新功能场景可接受，报告注明；若同一 AC 还能在既有接口上断言行为，优先补那条 |
+| `RED_EXIT` 非 0，原因与 AC 无关（环境、fixture、无关断言） | 无效，修正测试后重跑，不计为红 |
+| `RED_EXIT` 为 0 | **假绿**：测试在改动前就通过，不得提交。回到理解卡核对：断言是否太弱、落点是否正确、问题是否真实存在。确认 Issue 描述与代码现实不符时触发「重新开闸」 |
+
+纯重构、纯文案、或 AC 无法自动化时可跳过本节，但须在五态报告中把「先红后绿」记为 `未运行` 并写明原因。
+收尾报告逐条列出每个验收测试的红/绿结果。
 
 ## required status checks
 

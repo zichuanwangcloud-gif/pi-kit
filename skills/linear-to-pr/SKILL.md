@@ -217,25 +217,30 @@ printf 'fetchedAt=%s age=%ss\n' "$FETCHED" "$AGE"
 ```text
 【TEAM-N 理解卡】
 现象/动机：                     ... [来源]
+问题 → 目标结果 G1..Gn：        谁/场景/损失 → 解决后可观察的变化 [来源|推断]
 复现或触发路径：                ... [来源]
 期望：                          ... [来源]
-验收标准：                      ... [来源]（须为 EARS 句式，见下）
+验收标准：                      AC1 ... → G1；例：<输入> → <期望输出> [来源]（EARS 句式）
+负向/边界 AC：                  ... [来源|推断]（或：不存在，理由 ...）
+反向推演/范围外：               AC 全过仍会复现的情形 ... → 已补 ACn | 范围外 [理由]
 影响面/受影响 package：         ... [来源|推断]
 真实代码落点/调用链：           ... [代码 文件:行]
 被排除的候选落点：              ... [理由]
 最终需求口径：                  ... [采用依据]
 ```
 
-**验收标准须为 EARS 句式，并逐项写出六项自检的通过/未通过**——句式与自检表见
-`references/requirement-reading.md` §EARS 验收句式与六项自检。**缺口数 = 未通过项数**，不得凭感觉给数。
+**验收标准须为 EARS 句式且每条附具体例子，须能追溯到目标结果，至少含一条负向/边界 AC，并完成反向推演；
+逐项写出八项自检的通过/未通过**——句式、追溯链、反向推演与自检表见
+`references/requirement-reading.md` §EARS 验收句式与八项自检。**缺口数 = 未通过项数**，不得凭感觉给数。
+⑦⑧ 防的是「完全符合 Issue、却没解决问题」的 PR。
 
 处理：
 
 - 0 个缺口：回显理解卡和计划，请用户确认。
 - 1–2 个缺口：列缺口及带 `[推断]` 的假设，让用户补充或明确同意。
-- ≥3 个缺口，或期望/落点主要依赖推断：停止。
+- ≥3 个缺口，或期望/落点主要依赖推断：停止，建议先用 `idea-to-spec` 把需求收敛成 spec 并更新 Issue 后重跑。
 
-用户明确按假设推进时，将假设写入 PR body。
+用户明确按假设推进时，将假设写入 PR body。命中 `requirement-reading.md` §谁来确认 AC 本身 时提示用户先转需求方确认。
 
 ## Step 2：确定 Git 约定与实施计划
 
@@ -347,6 +352,8 @@ git -C "$WT" merge-base --is-ancestor "origin/$BASE" HEAD
 
 完整策略见 `references/verification.md`：作用域正确的命令形式、10 分钟时间预算、`timeout` + 落盘、**flaky 唯一判定路径（在未改动的 `origin/$BASE` 上复现）**、无测试框架时的手工验证降级。
 
+**验收测试必须先红后绿**（在未改动的 `origin/$BASE` 上失败、改动后通过），见 `references/verification.md` §验收测试先红后绿。
+
 结束检查：
 
 ```bash
@@ -425,7 +432,7 @@ gh pr create --base "$BASE" --head "$BR" \
 gh pr view "$BR" --json url,baseRefName,headRefName,state
 ```
 
-PR body 以**仓库自己的 PR 模板**为骨架，再追加「关联 / 需求理解 / 变更 / 验证 / 假设」四段；无模板时使用默认结构。模板与脱敏规则见 `references/pr-output.md`——禁止把 Linear 里的客户身份信息、邮箱、订单号、内网地址、任何环境凭据或生产日志原文复制进 PR。
+PR body 以**仓库自己的 PR 模板**为骨架，再追加「关联 / 需求理解 / 变更 / 验证 / 有效性信号 / 假设」各段；无模板时使用默认结构。模板与脱敏规则见 `references/pr-output.md`——禁止把 Linear 里的客户身份信息、邮箱、订单号、内网地址、任何环境凭据或生产日志原文复制进 PR。
 
 确认 `state=OPEN`、`baseRefName=$BASE`、`headRefName=$BR`。创建失败时报告错误和已推送分支，不把 push 成功误报成 PR 成功。**不要自动 merge、approve 或 ready**。
 
@@ -486,6 +493,6 @@ git -C "$WT" --no-pager show --stat --oneline HEAD
 - 需要改动既有测试的断言，或需要 skip 任何测试；
 - 计划中的验证命令不存在、无法运行或明显超出时间预算；
 - CODEOWNERS 显示改动横跨多个 owner 组；
-- 发现该 Issue 的真实口径与理解卡不一致。
+- 发现该 Issue 的真实口径与理解卡不一致，或验收测试在 `origin/$BASE` 上修正后仍无法变红（假绿）。
 
 区分清楚：**已确认事项不重复问，新事实必须问。**

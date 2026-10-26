@@ -19,6 +19,7 @@ const developmentSkills = [
 	"release-readiness",
 	"dependency-upgrade",
 	"incident-triage",
+	"pr-verify",
 ];
 const required = [
 	"package.json",
@@ -30,6 +31,7 @@ const required = [
 	"extensions/engineering-loop/types.ts",
 	"extensions/engineering-loop/utils.ts",
 	"skills/feature-trace/SKILL.md",
+	"skills/idea-to-spec/SKILL.md",
 	"skills/linear-to-pr/SKILL.md",
 	"skills/linear-to-pr/scripts/fetch-linear-issue.mjs",
 	"skills/linear-to-pr/scripts/update-issue-state.mjs",
@@ -42,6 +44,7 @@ const required = [
 	"docs/experience/pr-audit.md",
 	"docs/experience/linear-pr-audit.md",
 	"docs/experience/development-skills.md",
+	"docs/experience/idea-to-spec.md",
 ];
 
 for (const path of required) await access(resolve(root, path), constants.R_OK);
@@ -136,6 +139,24 @@ if (!/issueUpdate/.test(stateScript) || !/"started"/.test(stateScript)) {
 	throw new Error("update-issue-state.mjs must set the issue to its team's started state via issueUpdate");
 }
 
+// idea-to-spec writes exactly one artifact. These phrases are its whole write boundary; if one
+// disappears, the skill can silently start editing code or posting to a tracker.
+const ideaToSpecSkill = await readFile(resolve(root, "skills/idea-to-spec/SKILL.md"), "utf8");
+const requiredIdeaToSpecRules = [
+	"唯一的写操作是 spec 文档本身",
+	"不写任何 Issue 系统",
+	"不覆盖",
+	"缺口数 = 未通过项数",
+	"轮数上限 5 轮",
+	"不替需求方拍板",
+];
+for (const rule of requiredIdeaToSpecRules) {
+	if (!carries(ideaToSpecSkill, rule)) throw new Error(`idea-to-spec is missing policy: ${rule}`);
+}
+if (/(?:linear|jira)[^\n]{0,40}(?:mutation|issueCreate|commentCreate)/i.test(ideaToSpecSkill)) {
+	throw new Error("idea-to-spec must not call any tracker write API");
+}
+
 const prAuditSkill = await readFile(resolve(root, "skills/pr-audit/SKILL.md"), "utf8");
 const requiredAuditRules = [
 	"三个 Gate 都必须 `PASS`，即 **3 PASS**",
@@ -195,7 +216,7 @@ for (const rule of requiredLinearPrAuditRules) {
 // extraction is not automatically cheaper. Revisit by observing which references a real run opens.
 
 // Portability and shell-compatibility regressions caught in review.
-for (const path of [...developmentSkills, "feature-trace", "linear-to-pr", "pr-audit", "linear-pr-audit"]) {
+for (const path of [...developmentSkills, "feature-trace", "idea-to-spec", "linear-to-pr", "pr-audit", "linear-pr-audit"]) {
 	const files = [`skills/${path}/SKILL.md`];
 	for (const file of files) {
 		const content = await readFile(resolve(root, file), "utf8");
