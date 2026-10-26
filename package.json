@@ -17,6 +17,7 @@
 		"release-readiness",
 		"incident-response",
 		"requirements-discovery",
+		"product-requirements",
 		"linear"
 	],
 	"license": "UNLICENSED",
