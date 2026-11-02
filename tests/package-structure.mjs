@@ -32,6 +32,7 @@ const required = [
 	"extensions/engineering-loop/utils.ts",
 	"skills/feature-trace/SKILL.md",
 	"skills/idea-to-spec/SKILL.md",
+	"skills/capability-research/SKILL.md",
 	"skills/linear-to-pr/SKILL.md",
 	"skills/linear-to-pr/scripts/fetch-linear-issue.mjs",
 	"skills/linear-to-pr/scripts/update-issue-state.mjs",
@@ -45,6 +46,7 @@ const required = [
 	"docs/experience/linear-pr-audit.md",
 	"docs/experience/development-skills.md",
 	"docs/experience/idea-to-spec.md",
+	"docs/experience/capability-research.md",
 ];
 
 for (const path of required) await access(resolve(root, path), constants.R_OK);
@@ -157,6 +159,26 @@ if (/(?:linear|jira)[^\n]{0,40}(?:mutation|issueCreate|commentCreate)/i.test(ide
 	throw new Error("idea-to-spec must not call any tracker write API");
 }
 
+// capability-research writes research artifacts and runs live experiments. These phrases are its
+// whole safety boundary: drop one and the skill can start editing the researched project, touch a
+// shared or production environment, or ship an external doc that leaks implementation detail.
+const capabilityResearchSkill = await readFile(resolve(root, "skills/capability-research/SKILL.md"), "utf8");
+const requiredCapabilityResearchRules = [
+	"拿到关键证据再下结论",
+	"不修改被调研项目的源码",
+	"实验只在**隔离实例**上进行",
+	"连接任何线上或测试环境之前，先问用户",
+	"浏览器核对只看不保存",
+	"对外文档不覆盖内部报告",
+	"与蓝队不同上下文",
+	"没有证据不许下 REFUTED",
+	"主持者必须**亲自**用代码加实验定案",
+	"写完必须跑禁词扫描",
+];
+for (const rule of requiredCapabilityResearchRules) {
+	if (!carries(capabilityResearchSkill, rule)) throw new Error(`capability-research is missing policy: ${rule}`);
+}
+
 const prAuditSkill = await readFile(resolve(root, "skills/pr-audit/SKILL.md"), "utf8");
 const requiredAuditRules = [
 	"三个 Gate 都必须 `PASS`，即 **3 PASS**",
@@ -216,7 +238,7 @@ for (const rule of requiredLinearPrAuditRules) {
 // extraction is not automatically cheaper. Revisit by observing which references a real run opens.
 
 // Portability and shell-compatibility regressions caught in review.
-for (const path of [...developmentSkills, "feature-trace", "idea-to-spec", "linear-to-pr", "pr-audit", "linear-pr-audit"]) {
+for (const path of [...developmentSkills, "feature-trace", "idea-to-spec", "capability-research", "linear-to-pr", "pr-audit", "linear-pr-audit"]) {
 	const files = [`skills/${path}/SKILL.md`];
 	for (const file of files) {
 		const content = await readFile(resolve(root, file), "utf8");

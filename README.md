@@ -21,6 +21,7 @@
 | Skill 调度 | `/skills`、`invoke_skill` | 交互或由模型按任务加载已发现的 Skill |
 | PRD 生成 | `/skill:generate-prd <功能需求>` | 对一个已明确的功能做自适应多轮访谈，产出含需求清单、Given/When/Then 验收标准、四张表和 ASCII 线框图的 PRD，并派两个独立子 agent 评审范围与可执行性 |
 | 功能溯源 | `/skill:feature-trace <描述>` | 在 Web、服务端或 monorepo 中追踪真实代码路径、UI 入口、文案和测试点 |
+| 能力调研 | `/skill:capability-research "<能力或机制>"` | 深度调研一个能力的真实行为与影响它的配置：按维度并行读代码、隔离实例加可控上游桩实测、红队对抗复核后再下结论；产出内部证据报告，按需另出去掉过程与实现细节的对外说明 |
 | 需求收敛 | `/skill:idea-to-spec "<一句话想法>"` | 从一句话或模糊场景出发，分离问题与方案、取证现状、用例子多轮对齐、划出范围外，产出带例子化验收标准和八项自检的 spec Markdown；不绑定任何 Issue 系统 |
 | Linear → PR | `/skill:linear-to-pr TEAM-123 [--dry-run\|--no-pr]` | 先过 Issue 形态/状态闸门，分层读完全部评论与文档并输出理解卡；确认后在隔离 worktree 实现、逐包验证、推送任务分支并创建 PR，支持断点恢复 |
 | PR 三门审计 | `/skill:pr-audit 123 [--linear on]` | 只读审计正确性、可选的需求静态可追溯性和代码安全；启用 Gate 全部 PASS 后给出评级 |
@@ -255,6 +256,7 @@ skills/<name>/scripts/              该 Skill 调用的辅助脚本
 | Skill | references/ |
 |---|---|
 | `idea-to-spec` | `elicitation.md`、`spec-template.md` |
+| `capability-research` | `team-briefs.md`、`evidence-harness.md`、`external-doc.md` |
 | `linear-to-pr` | `worktree-setup.md`、`verification.md`、`pr-output.md`、`recovery.md` |
 | `linear-pr-audit` | `write-safety.md`、`ac-taxonomy.md`、`anti-tautology.md`、`rerun-scope.md`、`report-templates.md` |
 | `generate-prd` | `prd-template.md`、`review-dispatch.md` |
@@ -274,7 +276,7 @@ pi -e ./extensions/engineering-loop/index.ts
 4. 通用流程放在 Skill；项目专属命令和路径放在目标项目自己的说明中。
 5. 示例使用占位符或中性名称，不把单个项目约定描述为普遍规则。
 
-详见 [贡献与通用化指南](docs/CONTRIBUTING.md)、[迁移清单](docs/MIGRATION.md)、[通用开发 Skills 设计](docs/experience/development-skills.md)、[PR Audit 设计](docs/experience/pr-audit.md)、[Linear 验收审计设计](docs/experience/linear-pr-audit.md)、[需求收敛设计](docs/experience/idea-to-spec.md)、[Linear → PR 使用经验](docs/experience/linear-to-pr.md) 和 [经验文档](docs/experience/)。
+详见 [贡献与通用化指南](docs/CONTRIBUTING.md)、[迁移清单](docs/MIGRATION.md)、[通用开发 Skills 设计](docs/experience/development-skills.md)、[PR Audit 设计](docs/experience/pr-audit.md)、[Linear 验收审计设计](docs/experience/linear-pr-audit.md)、[需求收敛设计](docs/experience/idea-to-spec.md)、[能力调研设计](docs/experience/capability-research.md)、[Linear → PR 使用经验](docs/experience/linear-to-pr.md) 和 [经验文档](docs/experience/)。
 
 ## 安全边界
 
