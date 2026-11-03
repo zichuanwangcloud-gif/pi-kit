@@ -11,6 +11,7 @@ Pi Kit 可以通过 Git、Git bundle 或其他可信分发方式迁移。迁移�
 - `generate-prd`
 - `feature-trace`
 - `idea-to-spec`
+- `capability-research`
 - `linear-to-pr`
 - `pr-audit`
 - `linear-pr-audit`

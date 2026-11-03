@@ -143,6 +143,13 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 						],
 					},
 					{
+						title: "能力调研（会写调研产物）",
+						lines: [
+							"/skill:capability-research <能力或机制> — 拆维度并行读代码、隔离实例 + 可控上游桩实测、红队对抗复核后再下结论；产出内部证据报告，按需另出去掉实现细节的对外说明。",
+							"只写调研目录里的报告、实验脚本与输出；不改被调研项目源码，不 push、不部署，不连线上环境（要连先问）。",
+						],
+					},
+					{
 						title: "统一安全边界",
 						lines: [
 							"十项能力默认只读：不 push、不修改 PR/Linear、不部署、不触碰主工作区。",
@@ -152,7 +159,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 					},
 				],
 				paths: skills
-					.filter((skill) => ["ci-triage", "review-resolver", "change-impact", "test-gap", "schema-migration-audit", "api-contract-audit", "release-readiness", "dependency-upgrade", "incident-triage", "pr-verify"].includes(skill.name.replace(/^skill:/, "")))
+					.filter((skill) => ["ci-triage", "review-resolver", "change-impact", "test-gap", "schema-migration-audit", "api-contract-audit", "release-readiness", "dependency-upgrade", "incident-triage", "pr-verify", "capability-research"].includes(skill.name.replace(/^skill:/, "")))
 					.map((skill) => skill.sourceInfo.path),
 				createdAt: Date.now(),
 			};
@@ -373,6 +380,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 							"十个通用开发审计/排障 Skill 默认不 push、不改 PR/Linear、不部署、不触碰主工作区。",
 							"review-resolver 仅在明确修改授权、计划展示并确认、隔离任务工作区三项都满足后修改任务代码。",
 							"idea-to-spec 唯一的写操作是新建 spec Markdown，不改代码、不提交、不写任何 Issue 系统。",
+							"capability-research 只写调研产物（报告、实验脚本与输出），实验只跑在自己起的隔离实例上；对外说明另存新文件，不覆盖内部报告。",
 							"linear-to-pr 的既有确认闸门可授权任务分支 push/PR；合并、审批、Issue 回写、发布和部署仍需单独授权。",
 							"linear-pr-audit 的验收计划确认可授权修实现、推送修复到 PR head 分支和发送 Linear 自测报告；force push、改 PR 状态、提交临时验收测试和修改既有测试始终禁止。",
 						],
