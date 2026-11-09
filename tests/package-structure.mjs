@@ -33,6 +33,8 @@ const required = [
 	"skills/feature-trace/SKILL.md",
 	"skills/idea-to-spec/SKILL.md",
 	"skills/capability-research/SKILL.md",
+	"skills/manual-walkthrough/SKILL.md",
+	"skills/manual-walkthrough/references/project-profile.md",
 	"skills/linear-to-pr/SKILL.md",
 	"skills/linear-to-pr/scripts/fetch-linear-issue.mjs",
 	"skills/linear-to-pr/scripts/update-issue-state.mjs",
@@ -179,6 +181,23 @@ for (const rule of requiredCapabilityResearchRules) {
 	if (!carries(capabilityResearchSkill, rule)) throw new Error(`capability-research is missing policy: ${rule}`);
 }
 
+// manual-walkthrough drives a real browser against a running console. These phrases are its safety
+// boundary: drop one and it can act on the user's other tabs, screenshot a stale frame as evidence,
+// leak demo credentials into the manual, or write into the repository / production.
+const manualWalkthroughSkill = await readFile(resolve(root, "skills/manual-walkthrough/SKILL.md"), "utf8");
+const requiredManualWalkthroughRules = [
+	"锁死一个标签页",
+	"绝不对用户其他标签页操作",
+	"截图前先验活",
+	"结论必须带页面证据",
+	"密码不进任何 .md 和截图",
+	"写文件只落在 scratch 与手册目录",
+	"动生产页面前先问用户",
+];
+for (const rule of requiredManualWalkthroughRules) {
+	if (!carries(manualWalkthroughSkill, rule)) throw new Error(`manual-walkthrough is missing policy: ${rule}`);
+}
+
 const prAuditSkill = await readFile(resolve(root, "skills/pr-audit/SKILL.md"), "utf8");
 const requiredAuditRules = [
 	"三个 Gate 都必须 `PASS`，即 **3 PASS**",
@@ -238,7 +257,7 @@ for (const rule of requiredLinearPrAuditRules) {
 // extraction is not automatically cheaper. Revisit by observing which references a real run opens.
 
 // Portability and shell-compatibility regressions caught in review.
-for (const path of [...developmentSkills, "feature-trace", "idea-to-spec", "capability-research", "linear-to-pr", "pr-audit", "linear-pr-audit"]) {
+for (const path of [...developmentSkills, "feature-trace", "idea-to-spec", "capability-research", "manual-walkthrough", "linear-to-pr", "pr-audit", "linear-pr-audit"]) {
 	const files = [`skills/${path}/SKILL.md`];
 	for (const file of files) {
 		const content = await readFile(resolve(root, file), "utf8");
