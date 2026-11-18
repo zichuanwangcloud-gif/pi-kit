@@ -52,19 +52,27 @@
 
 1. 正文写成独立单页 HTML，放 `public/manuals/<id>.html`。内联 `<style>`，图片绝对路径 `/shots/<id>/xx.png`。
 2. 截图放 `public/shots/<id>/`。
-3. **每个大节用 `<section id="...">` 包起来**，否则搜索只能整篇定位。
-4. 在 `src/manuals/index.js` 加一条：id / title / subtitle / date / version / tag / cover / html / links / points（三条要点写「最容易踩的三个坑」）。
-5. `./start.sh` 自动构建；`dev` 模式改了正文要重启 dev server 索引才重建。也可 `pnpm index` 单跑。
-6. 打开 http://<本机IP>:8780/ 验证：首页卡片在、搜索关键词能命中小节、阅读页能跳到 `?s=<section>`。
+3. **操作视频必须同批发布**：放 `public/shots/<id>/manual-video.mp4`，正文顶部（第一个 `<section>` 之前）插：
+   ```html
+   <video controls preload="metadata" src="/shots/<id>/manual-video.mp4" style="width:100%;border-radius:8px"></video>
+   ```
+   渲染见 `references/video.md`。视频缺失时手册视为未完成，不能发布。
+4. **每个大节用 `<section id="...">` 包起来**，否则搜索只能整篇定位。
+5. 在 `src/manuals/index.js` 加一条：id / title / subtitle / date / version / tag / cover / html / links / points（三条要点写「最容易踩的三个坑」）。有视频时 `links` 里加一条「操作视频」。
+6. `./start.sh` 自动构建；`dev` 模式改了正文要重启 dev server 索引才重建。也可 `pnpm index` 单跑。
+7. 打开 http://<本机IP>:8780/ 验证：首页卡片在、搜索关键词能命中小节、阅读页能跳到 `?s=<section>`、**视频能播放且时长正常**。
 
 ## 交付自检
 
 - [ ] 每个编号有页面概览截图 + 每个主操作一张截图
 - [ ] `md5sum | uniq -c -w32` 无重复帧
 - [ ] 截图里没有密码、邮箱验证码、真实客户数据
+- [ ] **`manual-video.mp4` 已渲染成功**，能播放，分镜与手册主操作路径一致
+- [ ] **视频里没有未在正文出现的操作**，字幕无方块、无截断、无过期术语
+- [ ] **视频已内嵌/链接进手册**，发布后实际播放验证过
 - [ ] 正文无代码、路由名、组件名、CR 编号、内部术语
 - [ ] 术语与页面显示一致
 - [ ] 每个大节有 `<section id>`
 - [ ] 「走查发现的问题」已单列
 - [ ] 首页卡片与搜索命中已验证
-- [ ] 报告含：已完成编号 + 截图数、未覆盖项及原因、新登记账号（仅邮箱）、疑似缺陷、结束浏览器状态
+- [ ] 报告含：已完成编号 + 截图数、视频时长 + 分镜数、未覆盖项及原因、新登记账号（仅邮箱）、疑似缺陷、结束浏览器状态
