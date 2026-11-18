@@ -76,6 +76,7 @@ shot() {
 
 - 默认视口截图；整页用 `--full-page`；只截某块用 `--selector` 或 `--interactive-region`。
 - 弹窗/抽屉打开后再补一张；Tab 切换后、滚到小节顶部后再截。
+- **截一张、记一条分镜。** `shot()` 成功后立刻往 `steps.json` 追加一条（见 `references/video.md`），别等收工再回忆这张图在讲什么。只有主操作路径上的画面进分镜。
 - 跑完自检无重复帧：
   ```bash
   md5sum "$SH"/<批次>-*.png | sort | uniq -c -w32

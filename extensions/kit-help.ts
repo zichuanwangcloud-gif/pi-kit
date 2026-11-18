@@ -152,7 +152,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 					{
 						title: "操作手册走查（会写手册与截图）",
 						lines: [
-							"/skill:manual-walkthrough <页面或流程> — 用 DevEye 或无头 Playwright 在真实控制台逐页走查，产出带截图的客户向操作手册和走查发现；换项目只填 references/project-profile.md。",
+							"/skill:manual-walkthrough <页面或流程> — 用 DevEye 或无头 Playwright 在真实控制台逐页走查，产出带截图的客户向操作手册、一段由同批截图合成的操作视频和走查发现；换项目只填 references/project-profile.md。",
 							"只写 scratch 与手册目录，不改仓库源码、不碰 git；所有操作锁定一个标签页，不动用户其他标签；生产站只读，动生产前先问。",
 						],
 					},
@@ -388,7 +388,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 							"review-resolver 仅在明确修改授权、计划展示并确认、隔离任务工作区三项都满足后修改任务代码。",
 							"idea-to-spec 唯一的写操作是新建 spec Markdown，不改代码、不提交、不写任何 Issue 系统。",
 							"capability-research 只写调研产物（报告、实验脚本与输出），实验只跑在自己起的隔离实例上；对外说明另存新文件，不覆盖内部报告。",
-							"manual-walkthrough 只写 scratch 与手册目录，演示数据统一前缀可清理，密码不进 .md 和截图；生产站只读，动生产页面前先问用户。",
+							"manual-walkthrough 只写 scratch 与手册目录，演示数据统一前缀可清理，密码不进 .md 和截图；生产站只读，动生产页面前先问用户。视频只用本次走查截图渲染，不额外录屏。",
 							"linear-to-pr 的既有确认闸门可授权任务分支 push/PR；合并、审批、Issue 回写、发布和部署仍需单独授权。",
 							"linear-pr-audit 的验收计划确认可授权修实现、推送修复到 PR head 分支和发送 Linear 自测报告；force push、改 PR 状态、提交临时验收测试和修改既有测试始终禁止。",
 						],
