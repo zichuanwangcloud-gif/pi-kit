@@ -13,6 +13,7 @@ Pi Kit 可以通过 Git、Git bundle 或其他可信分发方式迁移。迁移�
 - `idea-to-spec`
 - `capability-research`
 - `manual-walkthrough`
+- Multica 平台 Skill：`multica-spec`、`multica-dev`、`multica-audit`、`multica-verify`、`multica-walkthrough`
 - `linear-to-pr`
 - `pr-audit`
 - `linear-pr-audit`

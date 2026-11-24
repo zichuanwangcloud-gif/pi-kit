@@ -21,6 +21,7 @@ const developmentSkills = [
 	"incident-triage",
 	"pr-verify",
 ];
+const multicaSkills = ["multica-spec", "multica-dev", "multica-audit", "multica-verify", "multica-walkthrough"];
 const required = [
 	"package.json",
 	"README.md",
@@ -35,6 +36,7 @@ const required = [
 	"skills/capability-research/SKILL.md",
 	"skills/manual-walkthrough/SKILL.md",
 	"skills/manual-walkthrough/references/project-profile.md",
+	...multicaSkills.map((name) => `skills/${name}/SKILL.md`),
 	"skills/linear-to-pr/SKILL.md",
 	"skills/linear-to-pr/scripts/fetch-linear-issue.mjs",
 	"skills/linear-to-pr/scripts/update-issue-state.mjs",
@@ -257,7 +259,7 @@ for (const rule of requiredLinearPrAuditRules) {
 // extraction is not automatically cheaper. Revisit by observing which references a real run opens.
 
 // Portability and shell-compatibility regressions caught in review.
-for (const path of [...developmentSkills, "feature-trace", "idea-to-spec", "capability-research", "manual-walkthrough", "linear-to-pr", "pr-audit", "linear-pr-audit"]) {
+for (const path of [...developmentSkills, "feature-trace", "idea-to-spec", "capability-research", "manual-walkthrough", ...multicaSkills, "linear-to-pr", "pr-audit", "linear-pr-audit"]) {
 	const files = [`skills/${path}/SKILL.md`];
 	for (const file of files) {
 		const content = await readFile(resolve(root, file), "utf8");
