@@ -157,6 +157,13 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 						],
 					},
 					{
+						title: "Multica 流水线（无交互平台）",
+						lines: [
+							"/skill:multica-spec → multica-dev → multica-audit（高风险 PR 用 multica-verify）；multica-walkthrough 走查出手册。",
+							"结论只通过 multica issue comment add 输出，最后一行是固定结论标记；只有 multica-dev 会提交、push 并创建 PR，不 force push、不 merge。",
+						],
+					},
+					{
 						title: "统一安全边界",
 						lines: [
 							"十项能力默认只读：不 push、不修改 PR/Linear、不部署、不触碰主工作区。",
@@ -166,7 +173,7 @@ function buildCard(pi: ExtensionAPI, topic: HelpTopic): HelpCardData {
 					},
 				],
 				paths: skills
-					.filter((skill) => ["ci-triage", "review-resolver", "change-impact", "test-gap", "schema-migration-audit", "api-contract-audit", "release-readiness", "dependency-upgrade", "incident-triage", "pr-verify", "capability-research", "manual-walkthrough"].includes(skill.name.replace(/^skill:/, "")))
+					.filter((skill) => ["ci-triage", "review-resolver", "change-impact", "test-gap", "schema-migration-audit", "api-contract-audit", "release-readiness", "dependency-upgrade", "incident-triage", "pr-verify", "capability-research", "manual-walkthrough", "multica-spec", "multica-dev", "multica-audit", "multica-verify", "multica-walkthrough"].includes(skill.name.replace(/^skill:/, "")))
 					.map((skill) => skill.sourceInfo.path),
 				createdAt: Date.now(),
 			};
